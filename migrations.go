@@ -89,10 +89,11 @@ func findDir(){
 
 func (r *Management) createMigrationFile(name string) *Management{
 	findDir()
-	tmpl, err := template.ParseFiles("/templates/Migration.tmpl")
+	tmpl, err := template.ParseGlob(src.Config.GetTmplMigration())
 	if err != nil {
 		panic(err)
 	}
+
 
 	data := struct {
 		StructureName string

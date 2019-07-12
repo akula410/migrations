@@ -21,6 +21,9 @@ type config struct{
 	flagTask string
 
 	migrationList []MigrationInterface
+
+	tmplMigration string
+	tmplMigrationList string
 }
 
 var Config config
@@ -41,6 +44,37 @@ func init(){
 	Config.flagMethod = "method"
 	Config.flagStep = "step"
 	Config.flagTask = "task"
+
+	Config.tmplMigration = `package migrations
+
+type {{ .StructureName}} struct{
+
+}
+
+var {{ .PropertyName}} {{.StructureName}}
+
+func (m {{ .StructureName}}) Up(){
+
+}
+
+func (m {{ .StructureName}}) Down(){
+
+}
+
+func (m {{ .StructureName}}) GetName() string{
+    return "{{ .PropertyName}}"
+}`
+
+Config.tmplMigrationList = `package generate
+
+import (
+    "github.com/akula410/migrations"
+    {{ .MigrationPackage}}
+)
+
+var MigrateList = []migrations.MigrationInterface{
+{{ .Migrations}}
+}`
 }
 
 
@@ -119,4 +153,12 @@ func (c *config) GetMigrationList() []MigrationInterface{
 
 func (c *config) GetMigration(i int) MigrationInterface{
 	return c.migrationList[i]
+}
+
+func (c *config) GetTmplMigration() string{
+	return c.tmplMigration
+}
+
+func (c *config) GetTmplMigrationList() string{
+	return c.tmplMigrationList
 }
