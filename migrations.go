@@ -77,7 +77,7 @@ func (r *Management) CreateMigration(task *string){
 }
 
 func (r *Management) createMigrationFile(name string) *Management{
-	tmpl, err := template.ParseFiles("github.com/akula410/migrations/templates/Migration.tmpl")
+	tmpl, err := template.ParseFiles("/templates/Migration.tmpl")
 	if err != nil {
 		panic(err)
 	}
