@@ -1,9 +1,12 @@
 package main
 
 import (
-	"github.com/akula410/migrations"
+	"fmt"
+	m "github.com/akula410/migrations"
 )
 
 func main(){
+	management := m.MigrateManagement{}
+	fmt.Println(management)
 
 }

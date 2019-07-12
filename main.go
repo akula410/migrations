@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"log"
+	"migrations/src"
 	"os"
 	"strings"
 )
@@ -17,34 +18,34 @@ type MigrateManagement struct {
 }
 
 func main(){
-	Method := flag.String(Config.GetFlagMethod(), "", "a string")
-	Step := flag.Int(Config.GetFlagStep(), Config.GetDefaultStep(), "a int")
-	Task := flag.String(Config.GetFlagTask(), "", "a string")
+	Method := flag.String(src.Config.GetFlagMethod(), "", "a string")
+	Step := flag.Int(src.Config.GetFlagStep(), src.Config.GetDefaultStep(), "a int")
+	Task := flag.String(src.Config.GetFlagTask(), "", "a string")
 	flag.Parse()
 	var r = &MigrateManagement{}
 
 	switch *Method{
-	case Config.GetMethodUp():
+	case src.Config.GetMethodUp():
 		r.ApplyUp(Step)
-	case Config.GetMethodDown():
+	case src.Config.GetMethodDown():
 		r.ApplyDown(Step)
-	case Config.GetMethodCreate():
+	case src.Config.GetMethodCreate():
 		r.CreateMigration(Task)
-	case Config.GetMethodInit():
+	case src.Config.GetMethodInit():
 		r.Init()
 	}
 }
 
 func (r *MigrateManagement) ApplyUp(step *int){
 	counter := 0
-	for i := len(Config.GetMigrationList())-1; i >= 0; i-- {
-		if !r.getResult(Config.GetMigration(i).GetName()) {
+	for i := len(src.Config.GetMigrationList())-1; i >= 0; i-- {
+		if !r.getResult(src.Config.GetMigration(i).GetName()) {
 			if counter == *step && *step != 0 {
 				break
 			}
-			Config.GetMigration(i).Up()
-			r.setResult(Config.GetMigration(i).GetName(), true)
-			fmt.Println(fmt.Sprintf("Migration %s up", Config.GetMigration(i).GetName()))
+			src.Config.GetMigration(i).Up()
+			r.setResult(src.Config.GetMigration(i).GetName(), true)
+			fmt.Println(fmt.Sprintf("Migration %s up", src.Config.GetMigration(i).GetName()))
 			counter++
 		}
 	}
@@ -55,7 +56,7 @@ func (r *MigrateManagement) ApplyDown(step *int){
 		*step = 1
 	}
 	counter := 0
-	for _, m := range Config.GetMigrationList() {
+	for _, m := range src.Config.GetMigrationList() {
 		if r.getResult(m.GetName()) {
 			if counter == *step {
 				break
@@ -70,7 +71,7 @@ func (r *MigrateManagement) ApplyDown(step *int){
 
 func (r *MigrateManagement) CreateMigration(task *string){
 
-	name := fmt.Sprintf("%s%s%s", Config.GetFilePrefix(), UUID.GetUUID(), *task)
+	name := fmt.Sprintf("%s%s%s", src.Config.GetFilePrefix(), src.UUID.GetUUID(), *task)
 	r.createMigrationFile(name).setMigrationReport(name).syncFileReportInMigrateList()
 }
 
@@ -94,7 +95,7 @@ func (r *MigrateManagement) createMigrationFile(name string) *MigrateManagement{
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(fmt.Sprintf("%s%s.go", Config.GetDirMigrations(), name), []byte(tpl.String()), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s.go", src.Config.GetDirMigrations(), name), []byte(tpl.String()), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -150,9 +151,9 @@ func (r *MigrateManagement) setMigrationReport(name string)*MigrateManagement{
 		}
 	}
 
-	r.scanReportFile(Config.GetFileReport(), scanFunc)
+	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
 	// обновить данные во всем файле
-	err = ioutil.WriteFile(Config.GetFileReport(), []byte(strings.Join(newFile, "\r\n")), 0644)
+	err = ioutil.WriteFile(src.Config.GetFileReport(), []byte(strings.Join(newFile, "\r\n")), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -164,7 +165,7 @@ func (r *MigrateManagement) askReportFile()bool{
 
 	result := true
 
-	_, err = os.Stat(Config.GetFileReport())
+	_, err = os.Stat(src.Config.GetFileReport())
 	if err != nil {
 		result = false
 	}
@@ -175,7 +176,7 @@ func (r *MigrateManagement) askReportFile()bool{
 func (r *MigrateManagement) createReportFile()*MigrateManagement{
 	var err error
 	var file *os.File
-	file, err = os.Create(Config.GetFileReport())
+	file, err = os.Create(src.Config.GetFileReport())
 	if err != nil {
 		panic(err)
 	}
@@ -210,7 +211,7 @@ func (r *MigrateManagement) getResult(name string) bool{
 		}
 	}
 
-	r.scanReportFile(Config.GetFileReport(), scanFunc)
+	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
 	return result
 }
 
@@ -242,10 +243,10 @@ func (r *MigrateManagement) setResult(name string, result bool){
 		newFile = append(newFile, strings.Trim(scanText, "\r\n "))
 	}
 
-	r.scanReportFile(Config.GetFileReport(), scanFunc)
+	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
 
 	// write the whole body at once
-	err = ioutil.WriteFile(Config.GetFileReport(), []byte(strings.Join(newFile, "\r\n")), 0644)
+	err = ioutil.WriteFile(src.Config.GetFileReport(), []byte(strings.Join(newFile, "\r\n")), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -256,7 +257,7 @@ func (r *MigrateManagement) scanReportFile(way string, scanFunc func(string)){
 	var file *os.File
 	var err error
 
-	file, err = os.Open(Config.GetFileReport())
+	file, err = os.Open(src.Config.GetFileReport())
 	if err != nil {
 		panic(err)
 	}
@@ -287,6 +288,6 @@ func (r *MigrateManagement) getMigrationNames() []string {
 			result = append(result, transformText[0])
 		}
 	}
-	r.scanReportFile(Config.GetFileReport(), scanFunc)
+	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
 	return result
 }
