@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	m "github.com/akula410/migrations"
+	"github.com/akula410/migrations/src"
 )
 
 func main(){
-	management := m.MigrateManagement{}
-	fmt.Println(management)
-
+	fmt.Println("1")
+	a := builder.Query{}
+	fmt.Println(a)
 }

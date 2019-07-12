@@ -1,4 +1,4 @@
-package main
+package migrations
 
 import (
 	"bufio"
@@ -13,16 +13,16 @@ import (
 	"strings"
 )
 
-type MigrateManagement struct {
+type Management struct {
 
 }
 
-func main(){
+func Init()*Management{
 	Method := flag.String(src.Config.GetFlagMethod(), "", "a string")
 	Step := flag.Int(src.Config.GetFlagStep(), src.Config.GetDefaultStep(), "a int")
 	Task := flag.String(src.Config.GetFlagTask(), "", "a string")
 	flag.Parse()
-	var r = &MigrateManagement{}
+	var r = &Management{}
 
 	switch *Method{
 	case src.Config.GetMethodUp():
@@ -32,11 +32,12 @@ func main(){
 	case src.Config.GetMethodCreate():
 		r.CreateMigration(Task)
 	case src.Config.GetMethodInit():
-		r.Init()
+		r.CreateStructure()
 	}
+	return r
 }
 
-func (r *MigrateManagement) ApplyUp(step *int){
+func (r *Management) ApplyUp(step *int){
 	counter := 0
 	for i := len(src.Config.GetMigrationList())-1; i >= 0; i-- {
 		if !r.getResult(src.Config.GetMigration(i).GetName()) {
@@ -51,7 +52,7 @@ func (r *MigrateManagement) ApplyUp(step *int){
 	}
 }
 
-func (r *MigrateManagement) ApplyDown(step *int){
+func (r *Management) ApplyDown(step *int){
 	if *step == 0 {
 		*step = 1
 	}
@@ -69,13 +70,13 @@ func (r *MigrateManagement) ApplyDown(step *int){
 	}
 }
 
-func (r *MigrateManagement) CreateMigration(task *string){
+func (r *Management) CreateMigration(task *string){
 
 	name := fmt.Sprintf("%s%s%s", src.Config.GetFilePrefix(), src.UUID.GetUUID(), *task)
 	r.createMigrationFile(name).setMigrationReport(name).syncFileReportInMigrateList()
 }
 
-func (r *MigrateManagement) createMigrationFile(name string) *MigrateManagement{
+func (r *Management) createMigrationFile(name string) *Management{
 	tmpl, err := template.ParseFiles("templates/Migration.tmpl")
 	if err != nil {
 		panic(err)
@@ -104,7 +105,7 @@ func (r *MigrateManagement) createMigrationFile(name string) *MigrateManagement{
 	return r
 }
 
-func (r *MigrateManagement) syncFileReportInMigrateList(){
+func (r *Management) syncFileReportInMigrateList(){
 	var methods = make([]string, 0)
 	//var err error
 
@@ -135,11 +136,11 @@ func (r *MigrateManagement) syncFileReportInMigrateList(){
 	}
 }
 
-func (r *MigrateManagement) Init(){
+func (r *Management) CreateStructure(){
 
 }
 
-func (r *MigrateManagement) setMigrationReport(name string)*MigrateManagement{
+func (r *Management) setMigrationReport(name string)*Management{
 	var err error
 	var newFile []string
 
@@ -160,7 +161,7 @@ func (r *MigrateManagement) setMigrationReport(name string)*MigrateManagement{
 	return r
 }
 
-func (r *MigrateManagement) askReportFile()bool{
+func (r *Management) askReportFile()bool{
 	var err error
 
 	result := true
@@ -173,7 +174,7 @@ func (r *MigrateManagement) askReportFile()bool{
 }
 
 
-func (r *MigrateManagement) createReportFile()*MigrateManagement{
+func (r *Management) createReportFile()*Management{
 	var err error
 	var file *os.File
 	file, err = os.Create(src.Config.GetFileReport())
@@ -189,7 +190,7 @@ func (r *MigrateManagement) createReportFile()*MigrateManagement{
 
 
 //Проверка состояния записи в отчете файла
-func (r *MigrateManagement) getResult(name string) bool{
+func (r *Management) getResult(name string) bool{
 	var result bool
 
 	var scanFunc = func(scanText string){
@@ -216,7 +217,7 @@ func (r *MigrateManagement) getResult(name string) bool{
 }
 
 //Изменение состояния записи в отчете файла
-func (r *MigrateManagement) setResult(name string, result bool){
+func (r *Management) setResult(name string, result bool){
 
 	var err error
 	var resultString []string
@@ -253,7 +254,7 @@ func (r *MigrateManagement) setResult(name string, result bool){
 }
 
 //Работа с файлом отчета миграций, построчно (scanFunc)
-func (r *MigrateManagement) scanReportFile(way string, scanFunc func(string)){
+func (r *Management) scanReportFile(way string, scanFunc func(string)){
 	var file *os.File
 	var err error
 
@@ -280,7 +281,7 @@ func (r *MigrateManagement) scanReportFile(way string, scanFunc func(string)){
 	}
 }
 
-func (r *MigrateManagement) getMigrationNames() []string {
+func (r *Management) getMigrationNames() []string {
 	var result = make([]string, 0)
 	var scanFunc = func(scanText string){
 		transformText := strings.Split(scanText, " ")
