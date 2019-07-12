@@ -1,0 +1,10 @@
+package generate
+
+import (
+    "github.com/akula410/migrations"
+    {{ .MigrationPackage}}
+)
+
+var MigrateList = []migrations.MigrationInterface{
+{{ .Migrations}}
+}
