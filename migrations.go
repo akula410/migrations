@@ -118,7 +118,9 @@ func (r *Management) syncFileReportInMigrateList(){
 		methods = append(methods, fmt.Sprintf("	migrations.%s", n))
 	}
 
-	tmpl, err := template.ParseFiles("templates/MigrationList.tmpl")
+	t := template.New("MigrationList")
+
+	tmpl, err := t.Parse(src.Config.GetTmplMigrationList())
 	if err != nil {
 		panic(err)
 	}
