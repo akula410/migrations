@@ -137,14 +137,57 @@ func (r *Management) syncFileReportInMigrateList(){
 		panic(err)
 	}
 
-	err = ioutil.WriteFile("generate/MigrationList.go", []byte(tpl.String()), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()), []byte(tpl.String()), 0644)
 	if err != nil {
 		panic(err)
 	}
 }
 
 func (r *Management) CreateStructure(){
+	r.createDirMigration().createDirReport().createDirGenerate().createScriptMigrationList()
+}
 
+func (r *Management) createDirMigration()*Management{
+	r.createDir(src.Config.GetDirMigrations(), 0644)
+	return r
+}
+
+func (r *Management) createDirReport()*Management{
+	r.createDir(src.Config.GetDirReport(), 0644)
+	return r
+}
+
+func (r *Management) createDirGenerate()*Management{
+	r.createDir(src.Config.GetDirGenerate(), 0644)
+	return r
+}
+
+func (r *Management) createScriptMigrationList(){
+	var err error
+
+	_, err = os.Stat(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()))
+	if err != nil {
+		var file *os.File
+		file, err = os.Create(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()))
+
+		if err != nil {
+			panic(err)
+		}
+		err = file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+}
+
+func (r *Management) createDir(path string, mode os.FileMode){
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err = os.Mkdir(path, mode)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (r *Management) setMigrationReport(name string)*Management{
@@ -159,9 +202,9 @@ func (r *Management) setMigrationReport(name string)*Management{
 		}
 	}
 
-	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
+	r.scanReportFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), scanFunc)
 	// обновить данные во всем файле
-	err = ioutil.WriteFile(src.Config.GetFileReport(), []byte(strings.Join(newFile, "\r\n")), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), []byte(strings.Join(newFile, "\r\n")), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -171,7 +214,7 @@ func (r *Management) setMigrationReport(name string)*Management{
 func (r *Management) createMigrationReport()*Management{
 	var err error
 	var file *os.File
-	file, err = os.Create(src.Config.GetFileReport())
+	file, err = os.Create(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()))
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +230,7 @@ func (r *Management) askReportFile()bool{
 
 	result := true
 
-	_, err = os.Stat(src.Config.GetFileReport())
+	_, err = os.Stat(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()))
 	if err != nil {
 		result = false
 	}
@@ -198,7 +241,7 @@ func (r *Management) askReportFile()bool{
 func (r *Management) createReportFile()*Management{
 	var err error
 	var file *os.File
-	file, err = os.Create(src.Config.GetFileReport())
+	file, err = os.Create(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()))
 	if err != nil {
 		panic(err)
 	}
@@ -233,7 +276,7 @@ func (r *Management) getResult(name string) bool{
 		}
 	}
 
-	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
+	r.scanReportFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), scanFunc)
 	return result
 }
 
@@ -265,10 +308,10 @@ func (r *Management) setResult(name string, result bool){
 		newFile = append(newFile, strings.Trim(scanText, "\r\n "))
 	}
 
-	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
+	r.scanReportFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), scanFunc)
 
 	// write the whole body at once
-	err = ioutil.WriteFile(src.Config.GetFileReport(), []byte(strings.Join(newFile, "\r\n")), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), []byte(strings.Join(newFile, "\r\n")), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -279,7 +322,7 @@ func (r *Management) scanReportFile(way string, scanFunc func(string)){
 	var file *os.File
 	var err error
 
-	file, err = os.Open(src.Config.GetFileReport())
+	file, err = os.Open(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()))
 	if err != nil {
 		panic(err)
 	}
@@ -310,6 +353,6 @@ func (r *Management) getMigrationNames() []string {
 			result = append(result, transformText[0])
 		}
 	}
-	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
+	r.scanReportFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), scanFunc)
 	return result
 }

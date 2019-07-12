@@ -5,7 +5,11 @@ package src
 type config struct{
 	fileReport string
 	filePrefix string
+	fileGenerate string
+
 	dirMigrations string
+	dirReport string
+	dirGenerate string
 
 	afterInit func()
 
@@ -24,15 +28,19 @@ type config struct{
 
 	tmplMigration string
 	tmplMigrationList string
+	tmplFileGenerate string
 }
 
 var Config config
 
 func init(){
-	Config.fileReport = "./report/report.local.conf"
+	Config.fileReport = "report.local.conf"
 	Config.filePrefix = "Migration"
+	Config.fileGenerate = "MigrateList"
 
 	Config.dirMigrations = "./migrations/"
+	Config.dirReport = "./report/"
+	Config.dirGenerate = "./generate/"
 
 	Config.methodUp = "up"
 	Config.methodDown = "down"
@@ -75,6 +83,10 @@ import (
 var MigrateList = []migrations.MigrationInterface{
 {{ .Migrations}}
 }`
+
+	Config.tmplFileGenerate = `package generate
+import "github.com/akula410/migrations/src"
+var MigrateList []src.MigrateInterface`
 }
 
 
@@ -92,6 +104,14 @@ func (c *config) SetDirMigrations(way string)*config{
 	c.dirMigrations = way
 	return c
 }
+
+func (c *config) SetDirReport(way string)*config{
+	c.dirReport = way
+	return c
+}
+
+
+
 
 func (c *config) SetAfterInit(f func())*config{
 	c.afterInit = f
@@ -137,9 +157,19 @@ func (c *config) GetFileReport()string{
 func (c *config) GetDirMigrations()string{
 	return c.dirMigrations
 }
+func (c *config) GetDirReport()string{
+	return c.dirReport
+}
+func (c *config) GetDirGenerate()string{
+	return c.dirGenerate
+}
 
 func (c *config) GetFilePrefix()string{
 	return c.filePrefix
+}
+
+func (c *config) GetFileGenerate()string{
+	return c.fileGenerate
 }
 
 func (c *config) SetMigrationList(list []MigrationInterface)string{
@@ -161,4 +191,8 @@ func (c *config) GetTmplMigration() string{
 
 func (c *config) GetTmplMigrationList() string{
 	return c.tmplMigrationList
+}
+
+func (c *config) GetTmplFileGenerate() string{
+	return c.tmplFileGenerate
 }
