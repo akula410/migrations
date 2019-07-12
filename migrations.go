@@ -71,9 +71,8 @@ func (r *Management) ApplyDown(step *int){
 }
 
 func (r *Management) CreateMigration(task *string){
-
 	name := fmt.Sprintf("%s%s%s", src.Config.GetFilePrefix(), src.UUID.GetUUID(), *task)
-	r.createMigrationFile(name).setMigrationReport(name).syncFileReportInMigrateList()
+	r.createMigrationFile(name).createMigrationReport().setMigrationReport(name).syncFileReportInMigrateList()
 }
 
 
@@ -99,6 +98,8 @@ func (r *Management) createMigrationFile(name string) *Management{
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Println()
 
 	err = ioutil.WriteFile(fmt.Sprintf("%s%s.go", src.Config.GetDirMigrations(), name), []byte(tpl.String()), 0644)
 	if err != nil {
@@ -159,6 +160,20 @@ func (r *Management) setMigrationReport(name string)*Management{
 	r.scanReportFile(src.Config.GetFileReport(), scanFunc)
 	// обновить данные во всем файле
 	err = ioutil.WriteFile(src.Config.GetFileReport(), []byte(strings.Join(newFile, "\r\n")), 0644)
+	if err != nil {
+		panic(err)
+	}
+	return r
+}
+
+func (r *Management) createMigrationReport(name string)*Management{
+	var err error
+	var file *os.File
+	file, err = os.Create(src.Config.GetFileReport())
+	if err != nil {
+		panic(err)
+	}
+	err = file.Close()
 	if err != nil {
 		panic(err)
 	}
