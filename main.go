@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-type migrateManagement struct {
+type MigrateManagement struct {
 
 }
 
@@ -21,7 +21,7 @@ func main(){
 	Step := flag.Int(Config.GetFlagStep(), Config.GetDefaultStep(), "a int")
 	Task := flag.String(Config.GetFlagTask(), "", "a string")
 	flag.Parse()
-	var r = &migrateManagement{}
+	var r = &MigrateManagement{}
 
 	switch *Method{
 	case Config.GetMethodUp():
@@ -35,7 +35,7 @@ func main(){
 	}
 }
 
-func (r *migrateManagement) ApplyUp(step *int){
+func (r *MigrateManagement) ApplyUp(step *int){
 	counter := 0
 	for i := len(Config.GetMigrationList())-1; i >= 0; i-- {
 		if !r.getResult(Config.GetMigration(i).GetName()) {
@@ -50,7 +50,7 @@ func (r *migrateManagement) ApplyUp(step *int){
 	}
 }
 
-func (r *migrateManagement) ApplyDown(step *int){
+func (r *MigrateManagement) ApplyDown(step *int){
 	if *step == 0 {
 		*step = 1
 	}
@@ -68,13 +68,13 @@ func (r *migrateManagement) ApplyDown(step *int){
 	}
 }
 
-func (r *migrateManagement) CreateMigration(task *string){
+func (r *MigrateManagement) CreateMigration(task *string){
 
 	name := fmt.Sprintf("%s%s%s", Config.GetFilePrefix(), UUID.GetUUID(), *task)
 	r.createMigrationFile(name).setMigrationReport(name).syncFileReportInMigrateList()
 }
 
-func (r *migrateManagement) createMigrationFile(name string) *migrateManagement{
+func (r *MigrateManagement) createMigrationFile(name string) *MigrateManagement{
 	tmpl, err := template.ParseFiles("templates/Migration.tmpl")
 	if err != nil {
 		panic(err)
@@ -103,7 +103,7 @@ func (r *migrateManagement) createMigrationFile(name string) *migrateManagement{
 	return r
 }
 
-func (r *migrateManagement) syncFileReportInMigrateList(){
+func (r *MigrateManagement) syncFileReportInMigrateList(){
 	var methods = make([]string, 0)
 	//var err error
 
@@ -134,11 +134,11 @@ func (r *migrateManagement) syncFileReportInMigrateList(){
 	}
 }
 
-func (r *migrateManagement) Init(){
+func (r *MigrateManagement) Init(){
 
 }
 
-func (r *migrateManagement) setMigrationReport(name string)*migrateManagement{
+func (r *MigrateManagement) setMigrationReport(name string)*MigrateManagement{
 	var err error
 	var newFile []string
 
@@ -159,7 +159,7 @@ func (r *migrateManagement) setMigrationReport(name string)*migrateManagement{
 	return r
 }
 
-func (r *migrateManagement) askReportFile()bool{
+func (r *MigrateManagement) askReportFile()bool{
 	var err error
 
 	result := true
@@ -172,7 +172,7 @@ func (r *migrateManagement) askReportFile()bool{
 }
 
 
-func (r *migrateManagement) createReportFile()*migrateManagement{
+func (r *MigrateManagement) createReportFile()*MigrateManagement{
 	var err error
 	var file *os.File
 	file, err = os.Create(Config.GetFileReport())
@@ -188,7 +188,7 @@ func (r *migrateManagement) createReportFile()*migrateManagement{
 
 
 //Проверка состояния записи в отчете файла
-func (r *migrateManagement) getResult(name string) bool{
+func (r *MigrateManagement) getResult(name string) bool{
 	var result bool
 
 	var scanFunc = func(scanText string){
@@ -215,7 +215,7 @@ func (r *migrateManagement) getResult(name string) bool{
 }
 
 //Изменение состояния записи в отчете файла
-func (r *migrateManagement) setResult(name string, result bool){
+func (r *MigrateManagement) setResult(name string, result bool){
 
 	var err error
 	var resultString []string
@@ -252,7 +252,7 @@ func (r *migrateManagement) setResult(name string, result bool){
 }
 
 //Работа с файлом отчета миграций, построчно (scanFunc)
-func (r *migrateManagement) scanReportFile(way string, scanFunc func(string)){
+func (r *MigrateManagement) scanReportFile(way string, scanFunc func(string)){
 	var file *os.File
 	var err error
 
@@ -279,7 +279,7 @@ func (r *migrateManagement) scanReportFile(way string, scanFunc func(string)){
 	}
 }
 
-func (r *migrateManagement) getMigrationNames() []string {
+func (r *MigrateManagement) getMigrationNames() []string {
 	var result = make([]string, 0)
 	var scanFunc = func(scanText string){
 		transformText := strings.Split(scanText, " ")
