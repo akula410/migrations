@@ -76,7 +76,19 @@ func (r *Management) CreateMigration(task *string){
 	r.createMigrationFile(name).setMigrationReport(name).syncFileReportInMigrateList()
 }
 
+func findDir(){
+	files, err := ioutil.ReadDir(".")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		fmt.Println(file.Name(), file.IsDir())
+	}
+}
+
 func (r *Management) createMigrationFile(name string) *Management{
+	findDir()
 	tmpl, err := template.ParseFiles("/templates/Migration.tmpl")
 	if err != nil {
 		panic(err)
