@@ -166,7 +166,7 @@ func (r *Management) setMigrationReport(name string)*Management{
 	return r
 }
 
-func (r *Management) createMigrationReport(name string)*Management{
+func (r *Management) createMigrationReport()*Management{
 	var err error
 	var file *os.File
 	file, err = os.Create(src.Config.GetFileReport())
