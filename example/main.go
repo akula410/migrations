@@ -9,7 +9,10 @@ import (
 
 func main(){
 	config := c.Config
+	config.SetPackageFileMigration("migrations/example/generate")
 
-	c.Config.SetPackageFileMigration("migrations/example/generate")
+	Management := &migrations.Management{}
+	Management.SetConfig(config)
+
 	migrations.Init()
 }

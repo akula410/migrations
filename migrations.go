@@ -5,16 +5,16 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	c "github.com/akula410/migrations/src"
 	"html/template"
 	"io/ioutil"
 	"log"
-	"migrations/src"
 	"os"
 	"strings"
 )
 
 type Management struct {
-	config src.ConfigAbstract
+	config c.ConfigAbstract
 }
 
 func (r *Management) Init()*Management{
@@ -70,7 +70,7 @@ func (r *Management) ApplyDown(step *int){
 }
 
 func (r *Management) CreateMigration(task *string){
-	name := fmt.Sprintf("%s%s%s", r.config.GetFilePrefix(), src.UUID.GetUUID(), *task)
+	name := fmt.Sprintf("%s%s%s", r.config.GetFilePrefix(), c.UUID.GetUUID(), *task)
 	r.createMigrationFile(name).createMigrationReport().setMigrationReport(name).syncFileReportInMigrateList()
 }
 
@@ -147,12 +147,12 @@ func (r *Management) CreateStructure(){
 	r.createDirMigration().createDirReport().createDirGenerate().createScriptMigrationList()
 }
 
-func (r *Management) SetConfig(config src.ConfigAbstract) *Management {
+func (r *Management) SetConfig(config c.ConfigAbstract) *Management {
 	r.config = config
 	return r
 }
 
-func (r *Management) GetConfig() src.ConfigAbstract {
+func (r *Management) GetConfig() c.ConfigAbstract {
 	return r.config
 }
 
