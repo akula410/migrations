@@ -12,7 +12,5 @@ func main(){
 	config.SetPackageFileMigration("migrations/example/generate")
 
 	Management := &migrations.Management{}
-	Management.SetConfig(config)
-
-	migrations.Init()
+	Management.SetConfig(config).Init()
 }
