@@ -137,7 +137,7 @@ func (r *Management) syncFileReportInMigrateList(){
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(fmt.Sprintf("%s%s", r.GetConfig().GetDirGenerate(), r.config.GetFileGenerate()), []byte(tpl.String()), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s", r.config.GetDirGenerate(), r.config.GetFileGenerate()), []byte(tpl.String()), 0644)
 	if err != nil {
 		panic(err)
 	}

@@ -8,6 +8,8 @@ import (
 )
 
 func main(){
+	config := c.Config
+
 	c.Config.SetPackageFileMigration("migrations/example/generate")
 	migrations.Init()
 }
