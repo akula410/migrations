@@ -29,6 +29,8 @@ type config struct{
 	tmplMigration string
 	tmplMigrationList string
 	tmplFileGenerate string
+
+	packageFileMigration string
 }
 
 var Config config
@@ -118,6 +120,11 @@ func (c *config) SetAfterInit(f func())*config{
 	return c
 }
 
+func (c *config) SetPackageFileMigration(pack string)*config{
+	c.packageFileMigration = pack
+	return c
+}
+
 func (c *config) GetDefaultStep()int{
 	return c.defaultStep
 }
@@ -195,4 +202,8 @@ func (c *config) GetTmplMigrationList() string{
 
 func (c *config) GetTmplFileGenerate() string{
 	return c.tmplFileGenerate
+}
+
+func (c *config) GetPackageFileMigration() string{
+	return c.packageFileMigration
 }
