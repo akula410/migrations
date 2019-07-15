@@ -181,7 +181,7 @@ func (r *Management) createScriptMigrationList(){
 		}
 
 		// обновить данные во всем файле
-		err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()), []byte(src.Config.GetFileGenerate()), 0644)
+		err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()), []byte(src.Config.GetTmplFileGenerate()), 0644)
 		if err != nil {
 			panic(err)
 		}
