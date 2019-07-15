@@ -36,7 +36,7 @@ var Config config
 func init(){
 	Config.fileReport = "report.local.conf"
 	Config.filePrefix = "Migration"
-	Config.fileGenerate = "MigrateList"
+	Config.fileGenerate = "MigrateList.go"
 
 	Config.dirMigrations = "./migrations/"
 	Config.dirReport = "./report/"
