@@ -128,7 +128,8 @@ func (r *Management) syncFileReportInMigrateList(){
 
 	data := struct{
 		Migrations string
-	}{Migrations: fmt.Sprintf("%s,", strings.Join(methods, ",\r\n"))}
+		MigrationPackage string
+	}{Migrations: fmt.Sprintf("%s,", strings.Join(methods, ",\r\n")), MigrationPackage: src.Config.GetPackageFileMigration()}
 
 
 	var tpl bytes.Buffer

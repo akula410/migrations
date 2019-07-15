@@ -2,12 +2,12 @@ package main
 
 import (
 	"github.com/akula410/migrations"
-	"migrations/src"
+	c "github.com/akula410/migrations/src"
 
 	//"migrations/example/generate"
 )
 
 func main(){
-	migrations/src.Config.SetPackageFileMigration("migrations/example/generate")
+	c.Config.SetPackageFileMigration("migrations/example/generate")
 	migrations.Init()
 }
