@@ -2,7 +2,7 @@ package src
 
 
 
-type config struct{
+type ConfigAbstract struct{
 	fileReport string
 	filePrefix string
 	fileGenerate string
@@ -33,7 +33,7 @@ type config struct{
 	packageFileMigration string
 }
 
-var Config config
+var Config ConfigAbstract
 
 func init(){
 	Config.fileReport = "report.local.conf"
@@ -92,22 +92,22 @@ var MigrateList []src.MigrateInterface`
 }
 
 
-func (c *config) SetFileReport(way string)*config{
+func (c *ConfigAbstract) SetFileReport(way string)*ConfigAbstract{
 	c.fileReport = way
 	return c
 }
 
-func (c *config) SetFilePrefix(way string)*config{
+func (c *ConfigAbstract) SetFilePrefix(way string)*ConfigAbstract{
 	c.filePrefix = way
 	return c
 }
 
-func (c *config) SetDirMigrations(way string)*config{
+func (c *ConfigAbstract) SetDirMigrations(way string)*ConfigAbstract{
 	c.dirMigrations = way
 	return c
 }
 
-func (c *config) SetDirReport(way string)*config{
+func (c *ConfigAbstract) SetDirReport(way string)*ConfigAbstract{
 	c.dirReport = way
 	return c
 }
@@ -115,95 +115,95 @@ func (c *config) SetDirReport(way string)*config{
 
 
 
-func (c *config) SetAfterInit(f func())*config{
+func (c *ConfigAbstract) SetAfterInit(f func())*ConfigAbstract{
 	c.afterInit = f
 	return c
 }
 
-func (c *config) SetPackageFileMigration(pack string)*config{
+func (c *ConfigAbstract) SetPackageFileMigration(pack string)*ConfigAbstract{
 	c.packageFileMigration = pack
 	return c
 }
 
-func (c *config) GetDefaultStep()int{
+func (c *ConfigAbstract) GetDefaultStep()int{
 	return c.defaultStep
 }
 
-func (c *config) GetFlagMethod()string{
+func (c *ConfigAbstract) GetFlagMethod()string{
 	return c.flagMethod
 }
 
-func (c *config) GetFlagStep()string{
+func (c *ConfigAbstract) GetFlagStep()string{
 	return c.flagStep
 }
 
-func (c *config) GetFlagTask()string{
+func (c *ConfigAbstract) GetFlagTask()string{
 	return c.flagTask
 }
 
-func (c *config) GetMethodUp()string{
+func (c *ConfigAbstract) GetMethodUp()string{
 	return c.methodUp
 }
 
-func (c *config) GetMethodDown()string{
+func (c *ConfigAbstract) GetMethodDown()string{
 	return c.methodDown
 }
 
-func (c *config) GetMethodCreate()string{
+func (c *ConfigAbstract) GetMethodCreate()string{
 	return c.methodCreate
 }
 
-func (c *config) GetMethodInit()string{
+func (c *ConfigAbstract) GetMethodInit()string{
 	return c.methodInit
 }
 
-func (c *config) GetFileReport()string{
+func (c *ConfigAbstract) GetFileReport()string{
 	return c.fileReport
 }
 
-func (c *config) GetDirMigrations()string{
+func (c *ConfigAbstract) GetDirMigrations()string{
 	return c.dirMigrations
 }
-func (c *config) GetDirReport()string{
+func (c *ConfigAbstract) GetDirReport()string{
 	return c.dirReport
 }
-func (c *config) GetDirGenerate()string{
+func (c *ConfigAbstract) GetDirGenerate()string{
 	return c.dirGenerate
 }
 
-func (c *config) GetFilePrefix()string{
+func (c *ConfigAbstract) GetFilePrefix()string{
 	return c.filePrefix
 }
 
-func (c *config) GetFileGenerate()string{
+func (c *ConfigAbstract) GetFileGenerate()string{
 	return c.fileGenerate
 }
 
-func (c *config) SetMigrationList(list []MigrationInterface)string{
+func (c *ConfigAbstract) SetMigrationList(list []MigrationInterface)string{
 	c.migrationList = list
 	return c.filePrefix
 }
 
-func (c *config) GetMigrationList() []MigrationInterface{
+func (c *ConfigAbstract) GetMigrationList() []MigrationInterface{
 	return c.migrationList
 }
 
-func (c *config) GetMigration(i int) MigrationInterface{
+func (c *ConfigAbstract) GetMigration(i int) MigrationInterface{
 	return c.migrationList[i]
 }
 
-func (c *config) GetTmplMigration() string{
+func (c *ConfigAbstract) GetTmplMigration() string{
 	return c.tmplMigration
 }
 
-func (c *config) GetTmplMigrationList() string{
+func (c *ConfigAbstract) GetTmplMigrationList() string{
 	return c.tmplMigrationList
 }
 
-func (c *config) GetTmplFileGenerate() string{
+func (c *ConfigAbstract) GetTmplFileGenerate() string{
 	return c.tmplFileGenerate
 }
 
-func (c *config) GetPackageFileMigration() string{
+func (c *ConfigAbstract) GetPackageFileMigration() string{
 	return c.packageFileMigration
 }

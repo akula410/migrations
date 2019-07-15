@@ -14,24 +14,23 @@ import (
 )
 
 type Management struct {
-
+	config src.ConfigAbstract
 }
 
-func Init()*Management{
-	Method := flag.String(src.Config.GetFlagMethod(), "", "a string")
-	Step := flag.Int(src.Config.GetFlagStep(), src.Config.GetDefaultStep(), "a int")
-	Task := flag.String(src.Config.GetFlagTask(), "", "a string")
+func (r *Management) Init()*Management{
+	Method := flag.String(r.config.GetFlagMethod(), "", "a string")
+	Step := flag.Int(r.config.GetFlagStep(), r.config.GetDefaultStep(), "a int")
+	Task := flag.String(r.config.GetFlagTask(), "", "a string")
 	flag.Parse()
-	var r = &Management{}
 
 	switch *Method{
-	case src.Config.GetMethodUp():
+	case r.config.GetMethodUp():
 		r.ApplyUp(Step)
-	case src.Config.GetMethodDown():
+	case r.config.GetMethodDown():
 		r.ApplyDown(Step)
-	case src.Config.GetMethodCreate():
+	case r.config.GetMethodCreate():
 		r.CreateMigration(Task)
-	case src.Config.GetMethodInit():
+	case r.config.GetMethodInit():
 		r.CreateStructure()
 	}
 	return r
@@ -39,14 +38,14 @@ func Init()*Management{
 
 func (r *Management) ApplyUp(step *int){
 	counter := 0
-	for i := len(src.Config.GetMigrationList())-1; i >= 0; i-- {
-		if !r.getResult(src.Config.GetMigration(i).GetName()) {
+	for i := len(r.config.GetMigrationList())-1; i >= 0; i-- {
+		if !r.getResult(r.config.GetMigration(i).GetName()) {
 			if counter == *step && *step != 0 {
 				break
 			}
-			src.Config.GetMigration(i).Up()
-			r.setResult(src.Config.GetMigration(i).GetName(), true)
-			fmt.Println(fmt.Sprintf("Migration %s up", src.Config.GetMigration(i).GetName()))
+			r.config.GetMigration(i).Up()
+			r.setResult(r.config.GetMigration(i).GetName(), true)
+			fmt.Println(fmt.Sprintf("Migration %s up", r.config.GetMigration(i).GetName()))
 			counter++
 		}
 	}
@@ -57,7 +56,7 @@ func (r *Management) ApplyDown(step *int){
 		*step = 1
 	}
 	counter := 0
-	for _, m := range src.Config.GetMigrationList() {
+	for _, m := range r.config.GetMigrationList() {
 		if r.getResult(m.GetName()) {
 			if counter == *step {
 				break
@@ -71,7 +70,7 @@ func (r *Management) ApplyDown(step *int){
 }
 
 func (r *Management) CreateMigration(task *string){
-	name := fmt.Sprintf("%s%s%s", src.Config.GetFilePrefix(), src.UUID.GetUUID(), *task)
+	name := fmt.Sprintf("%s%s%s", r.config.GetFilePrefix(), src.UUID.GetUUID(), *task)
 	r.createMigrationFile(name).createMigrationReport().setMigrationReport(name).syncFileReportInMigrateList()
 }
 
@@ -79,7 +78,7 @@ func (r *Management) CreateMigration(task *string){
 func (r *Management) createMigrationFile(name string) *Management{
 	t := template.New("Migration")
 
-	tmpl, err := t.Parse(src.Config.GetTmplMigration())
+	tmpl, err := t.Parse(r.config.GetTmplMigration())
 	if err != nil {
 		panic(err)
 	}
@@ -101,7 +100,7 @@ func (r *Management) createMigrationFile(name string) *Management{
 
 	fmt.Println()
 
-	err = ioutil.WriteFile(fmt.Sprintf("%s%s.go", src.Config.GetDirMigrations(), name), []byte(tpl.String()), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s.go", r.config.GetDirMigrations(), name), []byte(tpl.String()), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -120,7 +119,7 @@ func (r *Management) syncFileReportInMigrateList(){
 
 	t := template.New("MigrationList")
 
-	tmpl, err := t.Parse(src.Config.GetTmplMigrationList())
+	tmpl, err := t.Parse(r.config.GetTmplMigrationList())
 	if err != nil {
 		panic(err)
 	}
@@ -129,7 +128,7 @@ func (r *Management) syncFileReportInMigrateList(){
 	data := struct{
 		Migrations string
 		MigrationPackage string
-	}{Migrations: fmt.Sprintf("%s,", strings.Join(methods, ",\r\n")), MigrationPackage: src.Config.GetPackageFileMigration()}
+	}{Migrations: fmt.Sprintf("%s,", strings.Join(methods, ",\r\n")), MigrationPackage: r.config.GetPackageFileMigration()}
 
 
 	var tpl bytes.Buffer
@@ -138,7 +137,7 @@ func (r *Management) syncFileReportInMigrateList(){
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()), []byte(tpl.String()), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s", r.GetConfig().GetDirGenerate(), r.config.GetFileGenerate()), []byte(tpl.String()), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -148,28 +147,37 @@ func (r *Management) CreateStructure(){
 	r.createDirMigration().createDirReport().createDirGenerate().createScriptMigrationList()
 }
 
+func (r *Management) SetConfig(config src.ConfigAbstract) *Management {
+	r.config = config
+	return r
+}
+
+func (r *Management) GetConfig() src.ConfigAbstract {
+	return r.config
+}
+
 func (r *Management) createDirMigration()*Management{
-	r.createDir(src.Config.GetDirMigrations(), 0644)
+	r.createDir(r.config.GetDirMigrations(), 0644)
 	return r
 }
 
 func (r *Management) createDirReport()*Management{
-	r.createDir(src.Config.GetDirReport(), 0644)
+	r.createDir(r.config.GetDirReport(), 0644)
 	return r
 }
 
 func (r *Management) createDirGenerate()*Management{
-	r.createDir(src.Config.GetDirGenerate(), 0644)
+	r.createDir(r.config.GetDirGenerate(), 0644)
 	return r
 }
 
 func (r *Management) createScriptMigrationList(){
 	var err error
 
-	_, err = os.Stat(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()))
+	_, err = os.Stat(fmt.Sprintf("%s%s", r.config.GetDirGenerate(), r.config.GetFileGenerate()))
 	if err != nil {
 		var file *os.File
-		file, err = os.Create(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()))
+		file, err = os.Create(fmt.Sprintf("%s%s", r.config.GetDirGenerate(), r.config.GetFileGenerate()))
 
 		if err != nil {
 			panic(err)
@@ -182,7 +190,7 @@ func (r *Management) createScriptMigrationList(){
 		}
 
 		// обновить данные во всем файле
-		err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirGenerate(), src.Config.GetFileGenerate()), []byte(src.Config.GetTmplFileGenerate()), 0644)
+		err = ioutil.WriteFile(fmt.Sprintf("%s%s", r.config.GetDirGenerate(), r.config.GetFileGenerate()), []byte(r.config.GetTmplFileGenerate()), 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -211,9 +219,9 @@ func (r *Management) setMigrationReport(name string)*Management{
 		}
 	}
 
-	r.scanReportFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), scanFunc)
+	r.scanReportFile(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()), scanFunc)
 	// обновить данные во всем файле
-	err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), []byte(strings.Join(newFile, "\r\n")), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()), []byte(strings.Join(newFile, "\r\n")), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -223,7 +231,7 @@ func (r *Management) setMigrationReport(name string)*Management{
 func (r *Management) createMigrationReport()*Management{
 	var err error
 	var file *os.File
-	file, err = os.Create(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()))
+	file, err = os.Create(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()))
 	if err != nil {
 		panic(err)
 	}
@@ -239,7 +247,7 @@ func (r *Management) askReportFile()bool{
 
 	result := true
 
-	_, err = os.Stat(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()))
+	_, err = os.Stat(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()))
 	if err != nil {
 		result = false
 	}
@@ -250,7 +258,7 @@ func (r *Management) askReportFile()bool{
 func (r *Management) createReportFile()*Management{
 	var err error
 	var file *os.File
-	file, err = os.Create(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()))
+	file, err = os.Create(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()))
 	if err != nil {
 		panic(err)
 	}
@@ -285,7 +293,7 @@ func (r *Management) getResult(name string) bool{
 		}
 	}
 
-	r.scanReportFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), scanFunc)
+	r.scanReportFile(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()), scanFunc)
 	return result
 }
 
@@ -317,10 +325,10 @@ func (r *Management) setResult(name string, result bool){
 		newFile = append(newFile, strings.Trim(scanText, "\r\n "))
 	}
 
-	r.scanReportFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), scanFunc)
+	r.scanReportFile(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()), scanFunc)
 
 	// write the whole body at once
-	err = ioutil.WriteFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), []byte(strings.Join(newFile, "\r\n")), 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()), []byte(strings.Join(newFile, "\r\n")), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -331,7 +339,7 @@ func (r *Management) scanReportFile(way string, scanFunc func(string)){
 	var file *os.File
 	var err error
 
-	file, err = os.Open(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()))
+	file, err = os.Open(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()))
 	if err != nil {
 		panic(err)
 	}
@@ -362,6 +370,6 @@ func (r *Management) getMigrationNames() []string {
 			result = append(result, transformText[0])
 		}
 	}
-	r.scanReportFile(fmt.Sprintf("%s%s", src.Config.GetDirReport(), src.Config.GetFileReport()), scanFunc)
+	r.scanReportFile(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()), scanFunc)
 	return result
 }
