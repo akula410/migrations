@@ -78,7 +78,7 @@ func (m {{ .StructureName}}) GetName() string{
 Config.tmplMigrationList = `package generate
 
 import (
-    "github.com/akula410/migrations"
+    "github.com/akula410/migrations/src"
     {{ .MigrationPackage}}
 )
 
