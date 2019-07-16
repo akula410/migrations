@@ -144,7 +144,13 @@ func (r *Management) syncFileReportInMigrateList(){
 }
 
 func (r *Management) CreateStructure(){
+	if f := r.config.GetBeforeInit(); f != nil {
+		f()
+	}
 	r.createDirMigration().createDirReport().createDirGenerate().createScriptMigrationList()
+	if f := r.config.GetAfterInit(); f != nil {
+		f()
+	}
 }
 
 func (r *Management) SetConfig(config c.ConfigAbstract) *Management {
