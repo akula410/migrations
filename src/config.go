@@ -88,7 +88,7 @@ var MigrateList = []migrations.MigrationInterface{
 
 	Config.tmplFileGenerate = `package generate
 import "github.com/akula410/migrations/src"
-var MigrateList []src.MigrateInterface`
+var MigrateList []src.MigrationInterface`
 }
 
 
