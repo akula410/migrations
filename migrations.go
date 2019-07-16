@@ -231,23 +231,28 @@ func (r *Management) setMigrationReport(name string)*Management{
 func (r *Management) createMigrationReport()*Management{
 	var err error
 	var file *os.File
-	file, err = os.Create(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()))
-	if err != nil {
-		panic(err)
+	path := fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport())
+
+	if r.askReportFile() == false{
+		file, err = os.Create(path)
+		if err != nil {
+			panic(err)
+		}
+		err = file.Close()
+		if err != nil {
+			panic(err)
+		}
 	}
-	err = file.Close()
-	if err != nil {
-		panic(err)
-	}
+
 	return r
 }
 
 func (r *Management) askReportFile()bool{
 	var err error
-
+	path := fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport())
 	result := true
 
-	_, err = os.Stat(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()))
+	_, err = os.Stat(path)
 	if err != nil {
 		result = false
 	}

@@ -3,13 +3,13 @@ package main
 import (
 	"github.com/akula410/migrations"
 	c "github.com/akula410/migrations/src"
-	//"migrations/example/generate"
+	"migrations/example/generate"
 )
 
 func main(){
 	config := c.Config
-	config.SetPackageFileMigration("migrations/example/generate")
-	//config.SetMigrationList(generate.MigrateList)
+	config.SetPackageFileMigration("migrations/example/migrations")
+	config.SetMigrationList(generate.MigrateList)
 
 	Management := &migrations.Management{}
 	Management.SetConfig(config).Init()
