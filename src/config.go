@@ -79,10 +79,10 @@ Config.tmplMigrationList = `package generate
 
 import (
     "github.com/akula410/migrations/src"
-    {{ .MigrationPackage}}
+    "{{ .MigrationPackage}}"
 )
 
-var MigrateList = []migrations.MigrationInterface{
+var MigrateList = []src.MigrationInterface{
 {{ .Migrations}}
 }`
 
