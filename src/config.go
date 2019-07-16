@@ -11,6 +11,7 @@ type ConfigAbstract struct{
 	dirReport string
 	dirGenerate string
 
+	beforeInit func()
 	afterInit func()
 
 	methodUp string
@@ -114,6 +115,10 @@ func (c *ConfigAbstract) SetDirReport(way string)*ConfigAbstract{
 
 
 
+func (c *ConfigAbstract) SetBeforeInit(f func())*ConfigAbstract{
+	c.beforeInit = f
+	return c
+}
 
 func (c *ConfigAbstract) SetAfterInit(f func())*ConfigAbstract{
 	c.afterInit = f
@@ -124,6 +129,10 @@ func (c *ConfigAbstract) SetPackageFileMigration(pack string)*ConfigAbstract{
 	c.packageFileMigration = pack
 	return c
 }
+
+
+
+
 
 func (c *ConfigAbstract) GetDefaultStep()int{
 	return c.defaultStep
@@ -167,6 +176,15 @@ func (c *ConfigAbstract) GetDirMigrations()string{
 func (c *ConfigAbstract) GetDirReport()string{
 	return c.dirReport
 }
+
+func (c *ConfigAbstract) GetBeforeInit() func(){
+	return c.beforeInit
+}
+
+func (c *ConfigAbstract) GetAfterInit() func(){
+	return c.afterInit
+}
+
 func (c *ConfigAbstract) GetDirGenerate()string{
 	return c.dirGenerate
 }
