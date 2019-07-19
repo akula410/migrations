@@ -45,16 +45,16 @@ func init(){
 	Config.dirReport = "./report/"
 	Config.dirGenerate = "./generate/"
 
-	Config.methodUp = "up"
-	Config.methodDown = "down"
-	Config.methodCreate = "create"
-	Config.methodInit = "init"
+	Config.methodUp = "u"
+	Config.methodDown = "d"
+	Config.methodCreate = "c"
+	Config.methodInit = "i"
 
 	Config.defaultStep = 0
 
-	Config.flagMethod = "method"
-	Config.flagStep = "step"
-	Config.flagTask = "task"
+	Config.flagMethod = "m"
+	Config.flagStep = "s"
+	Config.flagTask = "t"
 
 	Config.tmplMigration = `package migrations
 
