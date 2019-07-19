@@ -29,7 +29,7 @@ func (r *Management) Init()*Management{
 	case r.config.GetMethodDown():
 		r.syncMigrateListInFileReport().ApplyDown(Step)
 	case r.config.GetMethodCreate():
-		r.CreateMigration(Task)
+		r.syncMigrateListInFileReport().CreateMigration(Task)
 	case r.config.GetMethodInit():
 		r.CreateStructure()
 	}
@@ -300,7 +300,7 @@ func (r *Management) getResult(name string) (bool, bool){
 	var result bool
 	var ok bool
 
-	ok = true
+	ok = false
 
 	var scanFunc = func(scanText string){
 		if len(scanText)>0 {
@@ -312,10 +312,12 @@ func (r *Management) getResult(name string) (bool, bool){
 				switch resultString[1] {
 				case "true":
 					result=true
+					ok = true
 				case "false":
 					result=false
+					ok = true
 				default:
-					ok = false
+					panic("Error structure report file")
 				}
 			}
 		}
