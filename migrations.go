@@ -229,7 +229,7 @@ func (r *Management) createDir(path string, mode os.FileMode){
 
 func (r *Management) setMigrationReport(name string)*Management{
 	var err error
-	var newFile []string
+	var newFile = make([]string, 0)
 
 	//Добавить новую миграцию в начало файла
 	newFile = append(newFile, fmt.Sprintf("%s %s", name, "false"))
