@@ -25,9 +25,9 @@ func (r *Management) Init()*Management{
 
 	switch *Method{
 	case r.config.GetMethodUp():
-		r.ApplyUp(Step)
+		r.syncMigrateListInFileReport().ApplyUp(Step)
 	case r.config.GetMethodDown():
-		r.ApplyDown(Step)
+		r.syncMigrateListInFileReport().ApplyDown(Step)
 	case r.config.GetMethodCreate():
 		r.CreateMigration(Task)
 	case r.config.GetMethodInit():
@@ -39,7 +39,7 @@ func (r *Management) Init()*Management{
 func (r *Management) ApplyUp(step *int){
 	counter := 0
 	for i := len(r.config.GetMigrationList())-1; i >= 0; i-- {
-		if !r.getResult(r.config.GetMigration(i).GetName()) {
+		if res, _ := r.getResult(r.config.GetMigration(i).GetName()); res==false {
 			if counter == *step && *step != 0 {
 				break
 			}
@@ -57,7 +57,7 @@ func (r *Management) ApplyDown(step *int){
 	}
 	counter := 0
 	for _, m := range r.config.GetMigrationList() {
-		if r.getResult(m.GetName()) {
+		if res, _ := r.getResult(m.GetName()); res==true {
 			if counter == *step {
 				break
 			}
@@ -68,6 +68,7 @@ func (r *Management) ApplyDown(step *int){
 		}
 	}
 }
+
 
 func (r *Management) CreateMigration(task *string){
 	name := fmt.Sprintf("%s%s%s", r.config.GetFilePrefix(), c.UUID.GetUUID(), *task)
@@ -141,6 +142,19 @@ func (r *Management) syncFileReportInMigrateList(){
 	if err != nil {
 		panic(err)
 	}
+}
+
+//При переносе данных между ветками, файл конфигурации не переносится
+func (r *Management) syncMigrateListInFileReport()*Management{
+	r.createDirReport().createMigrationReport()
+
+	for _, m := range r.config.GetMigrationList() {
+		if _, ok := r.getResult(m.GetName()); ok==false {
+			r.setMigrationReport(m.GetName())
+		}
+	}
+
+	return r
 }
 
 func (r *Management) CreateStructure(){
@@ -282,8 +296,11 @@ func (r *Management) createReportFile()*Management{
 
 
 //Проверка состояния записи в отчете файла
-func (r *Management) getResult(name string) bool{
+func (r *Management) getResult(name string) (bool, bool){
 	var result bool
+	var ok bool
+
+	ok = true
 
 	var scanFunc = func(scanText string){
 		if len(scanText)>0 {
@@ -298,14 +315,14 @@ func (r *Management) getResult(name string) bool{
 				case "false":
 					result=false
 				default:
-					panic("Error config result")
+					ok = false
 				}
 			}
 		}
 	}
 
 	r.scanReportFile(fmt.Sprintf("%s%s", r.config.GetDirReport(), r.config.GetFileReport()), scanFunc)
-	return result
+	return result, ok
 }
 
 //Изменение состояния записи в отчете файла
