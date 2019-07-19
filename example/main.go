@@ -7,15 +7,15 @@ import (
 )
 
 /**
-	example -method=init
+	example -m=i
 	uncomment
 		"migrations/example/generate"
 		config.SetMigrationList(generate.MigrateList)
 	go build
-	example -method=create
+	example -m=c
 	go build
-	example -method=up
-	example -method=down -step=1
+	example -m=u
+	example -m=d -s=1
 
  */
 func main(){
