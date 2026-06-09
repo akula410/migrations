@@ -32,15 +32,13 @@ func (m CreateTagsTable20260608000003) Version() string { return "20260608000003
 func (m CreateTagsTable20260608000003) Name() string    { return "create_tags_table" }
 
 func (m CreateTagsTable20260608000003) Up(ctx context.Context, db *sql.DB) error {
-	// Use the builder DDL API to construct the CREATE TABLE statement safely.
 	exec := sqlbuilder.NewExecutor(db)
-
 	_, err := exec.ExecContext(ctx,
 		sqlbuilder.CreateTable("tags").
 			IfNotExists().
-			Column(sqlbuilder.Col("id").BigIntUnsigned().NotNull().AutoIncrement()).
-			Column(sqlbuilder.Col("name").VarChar(100).NotNull()).
-			Column(sqlbuilder.Col("created_at").Timestamp().NotNull().Default("CURRENT_TIMESTAMP")).
+			Column(sqlbuilder.Column("id", "BIGINT UNSIGNED").NotNull().AutoIncrement()).
+			Column(sqlbuilder.Column("name", "VARCHAR(100)").NotNull()).
+			Column(sqlbuilder.Column("created_at", "TIMESTAMP").NotNull().DefaultRaw("CURRENT_TIMESTAMP")).
 			PrimaryKey("id").
 			UniqueIndex("uq_tags_name", "name").
 			Engine("InnoDB").

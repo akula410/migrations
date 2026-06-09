@@ -11,4 +11,6 @@ var (
 	ErrDirtyState              = errors.New("migration dirty state")
 	ErrInvalidIdentifier       = errors.New("invalid identifier")
 	ErrDuplicateVersion        = errors.New("duplicate migration version")
+	ErrUnsupportedDialect      = errors.New("unsupported dialect")
+	ErrInvalidMigration        = errors.New("invalid migration")
 )

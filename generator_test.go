@@ -128,3 +128,41 @@ func TestGenerateMigration_InvalidName(t *testing.T) {
 		t.Fatal("expected error for all-special-char name")
 	}
 }
+
+// TestGenerateMigration_ContainsChecksumMethod verifies that the generated file
+// includes the Checksum() method and the SQL constants required for SQL-body detection.
+func TestGenerateMigration_ContainsChecksumMethod(t *testing.T) {
+	dir := t.TempDir()
+	ts := time.Date(2026, 6, 8, 12, 0, 0, 0, time.UTC)
+
+	if err := migrations.GenerateMigration(migrations.GenerateOptions{
+		Dir:         dir,
+		PackageName: "mymigrations",
+		Name:        "create_users_table",
+		Timestamp:   ts,
+	}); err != nil {
+		t.Fatalf("GenerateMigration: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "20260608120000_create_users_table.go"))
+	if err != nil {
+		t.Fatalf("file not created: %v", err)
+	}
+
+	content := string(data)
+	checks := []struct {
+		label string
+		want  string
+	}{
+		{"upSQL const", "UpSQL"},
+		{"downSQL const", "DownSQL"},
+		{"Checksum method", "func (m CreateUsersTable20260608120000) Checksum() string"},
+		{"sha256 import", `"crypto/sha256"`},
+		{"fmt import", `"fmt"`},
+	}
+	for _, c := range checks {
+		if !strings.Contains(content, c.want) {
+			t.Errorf("%s not found in generated file", c.label)
+		}
+	}
+}

@@ -28,8 +28,21 @@ var migrationTmpl = template.Must(template.New("migration").Parse(
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"fmt"
 )
+
+// {{.VarPrefix}}UpSQL and {{.VarPrefix}}DownSQL are package-level constants so that
+// Checksum() automatically detects SQL body changes: edit the SQL here and the stored
+// checksum will diverge, triggering ErrChecksumMismatch on the next run.
+const {{.VarPrefix}}UpSQL = ` + "`" + `
+	-- TODO: write your UP migration SQL here
+` + "`" + `
+
+const {{.VarPrefix}}DownSQL = ` + "`" + `
+	-- TODO: write your DOWN migration SQL here
+` + "`" + `
 
 type {{.StructName}} struct{}
 
@@ -37,21 +50,25 @@ func (m {{.StructName}}) Version() string { return "{{.Version}}" }
 func (m {{.StructName}}) Name() string    { return "{{.NameSnake}}" }
 
 func (m {{.StructName}}) Up(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, ` + "`" + `
-		-- TODO: add migration SQL here
-	` + "`" + `)
+	_, err := db.ExecContext(ctx, {{.VarPrefix}}UpSQL)
 	return err
 }
 
 func (m {{.StructName}}) Down(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, ` + "`" + `
-		-- TODO: add rollback SQL here
-	` + "`" + `)
+	_, err := db.ExecContext(ctx, {{.VarPrefix}}DownSQL)
 	return err
 }
 
-// TODO: optionally implement ChecksumMigration to detect SQL body changes:
-// func (m {{.StructName}}) Checksum() string { return "sha256:<hash-of-sql-body>" }
+// Checksum implements ChecksumMigration. It is derived from the SQL body so that any
+// edit to {{.VarPrefix}}UpSQL or {{.VarPrefix}}DownSQL is detected before the migration
+// can be silently re-applied with a different schema.
+func (m {{.StructName}}) Checksum() string {
+	h := sha256.New()
+	h.Write([]byte({{.VarPrefix}}UpSQL))
+	h.Write([]byte{0})
+	h.Write([]byte({{.VarPrefix}}DownSQL))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
 `))
 
 var listTmpl = template.Must(template.New("list").Parse(
@@ -93,9 +110,16 @@ func GenerateMigration(opts GenerateOptions) error {
 	data := struct {
 		PackageName string
 		StructName  string
+		VarPrefix   string
 		Version     string
 		NameSnake   string
-	}{opts.PackageName, structName, version, nameSnake}
+	}{
+		PackageName: opts.PackageName,
+		StructName:  structName,
+		VarPrefix:   lowerFirst(structName),
+		Version:     version,
+		NameSnake:   nameSnake,
+	}
 
 	var buf bytes.Buffer
 	if err := migrationTmpl.Execute(&buf, data); err != nil {
@@ -169,4 +193,11 @@ func toPascalCase(snake string) string {
 		b.WriteString(p[1:])
 	}
 	return b.String()
+}
+
+func lowerFirst(s string) string {
+	if s == "" {
+		return ""
+	}
+	return strings.ToLower(s[:1]) + s[1:]
 }

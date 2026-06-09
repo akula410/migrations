@@ -14,12 +14,9 @@ Production-ready MySQL 8 migration runner for Go.
 
 ## Compatibility
 
-| Database   | Status             |
-|------------|--------------------|
-| MySQL 8    | supported          |
-| MariaDB    | experimental       |
-| PostgreSQL | not supported yet  |
-| SQLite     | not supported yet  |
+Only **MySQL 8** is supported. Passing any other dialect to `WithDialect` returns `ErrUnsupportedDialect`.
+
+PostgreSQL, SQLite, and MariaDB are not supported. The package is intentionally MySQL-specific so it can rely on MySQL semantics (advisory locks, `ENUM`, `TINYINT`, `AUTO_INCREMENT`, `ON DUPLICATE KEY UPDATE`).
 
 ## Installation
 
@@ -117,18 +114,19 @@ func (m *Migrator) Validate(ctx context.Context) error
 
 ## Options
 
-| Option                             | Default                   | Description                       |
-|------------------------------------|---------------------------|-----------------------------------|
-| `WithMigrations(ms ...Migration)`  | —                         | Register migrations               |
-| `WithTableName(name)`              | `schema_migrations`       | History table name                |
-| `WithLogger(logger)`               | noop                      | Progress logger                   |
-| `WithLock(enabled)`                | `true`                    | Enable MySQL GET_LOCK             |
-| `WithLockName(name)`               | `migrations_lock`         | Lock identifier                   |
-| `WithLockTimeout(d)`               | `30s`                     | GET_LOCK timeout                  |
-| `WithAutoCreateTable(enabled)`     | `true`                    | Auto-create schema table          |
-| `WithTransactionMode(mode)`        | `TransactionPerMigration` | Transaction strategy              |
-| `WithChecksumValidation(enabled)`  | `true`                    | Detect modified migrations        |
-| `WithAllowDirty(enabled)`          | `false`                   | Skip checksum errors              |
+| Option                             | Default                   | Description                                                |
+|------------------------------------|---------------------------|------------------------------------------------------------|
+| `WithMigrations(ms ...Migration)`  | —                         | Register migrations. Returns `ErrInvalidMigration` for nil/empty `Version`/`Name`. |
+| `WithTableName(name)`              | `schema_migrations`       | History table name                                         |
+| `WithDialect(dialect)`             | `MySQL`                   | Only `MySQL` is accepted; others return `ErrUnsupportedDialect`. |
+| `WithLogger(logger)`               | noop                      | Progress logger                                            |
+| `WithLock(enabled)`                | `true`                    | Enable MySQL `GET_LOCK` on a dedicated connection          |
+| `WithLockName(name)`               | `migrations_lock`         | Lock identifier                                            |
+| `WithLockTimeout(d)`               | `30s`                     | `GET_LOCK` timeout                                         |
+| `WithAutoCreateTable(enabled)`     | `true`                    | Auto-create schema table                                   |
+| `WithTransactionMode(mode)`        | `TransactionPerMigration` | Transaction strategy                                       |
+| `WithChecksumValidation(enabled)`  | `true`                    | Detect modified migrations                                 |
+| `WithAllowDirty(enabled)`          | `false`                   | Skip dirty-state check                                     |
 
 ## Example: database/sql
 
@@ -153,6 +151,9 @@ See `examples/with_connect/main.go`.
 
 ## Example: with builder
 
+The `builder/v2` column API uses `Column(name, "TYPE")` with plain SQL type strings.
+There are no `.VarChar()`, `.BigInt()`, or similar method-based type helpers.
+
 ```go
 import sqlbuilder "github.com/akula410/builder/v2"
 
@@ -161,10 +162,12 @@ func (m MyMigration) Up(ctx context.Context, db *sql.DB) error {
     _, err := exec.ExecContext(ctx,
         sqlbuilder.CreateTable("posts").
             IfNotExists().
-            Column(sqlbuilder.Col("id").BigIntUnsigned().NotNull().AutoIncrement()).
-            Column(sqlbuilder.Col("title").VarChar(255).NotNull()).
+            Column(sqlbuilder.Column("id", "BIGINT UNSIGNED").NotNull().AutoIncrement()).
+            Column(sqlbuilder.Column("title", "VARCHAR(255)").NotNull()).
+            Column(sqlbuilder.Column("created_at", "TIMESTAMP").NotNull().DefaultRaw("CURRENT_TIMESTAMP")).
             PrimaryKey("id").
-            Engine("InnoDB"),
+            Engine("InnoDB").
+            Collate("utf8mb4_unicode_ci"),
     )
     return err
 }
@@ -194,11 +197,18 @@ migrations.GenerateMigrationList("migrations", "migrations", []string{
 
 ## CLI
 
+`cmd/migrations/main.go` is a **skeleton** — it ships with an empty `migrationList`. It is intended as a starting point that you copy into your own application and wire up with your concrete migration list:
+
+```go
+// In your copy of cmd/migrations/main.go:
+var migrationList []migrations.Migration = yourmigrations.List
+```
+
 ```bash
 export MYSQL_DSN='user:pass@tcp(127.0.0.1:3306)/db?parseTime=true'
 
 migrations init                    # create schema_migrations table
-migrations create create_users     # generate a new migration file
+migrations create create_users     # generate a new migration file in $MIGRATIONS_DIR
 migrations up                      # apply all pending migrations
 migrations up --steps=1            # apply exactly 1 migration
 migrations down --steps=1          # roll back 1 migration
@@ -206,7 +216,7 @@ migrations status                  # print migration status
 migrations validate                # validate checksums
 ```
 
-See `cmd/migrations/main.go`.
+For a fully wired example (generator + list + CLI) see `examples/generated_migrations/`.
 
 ## schema_migrations table
 
@@ -235,8 +245,9 @@ SELECT GET_LOCK('migrations_lock', 30)
 SELECT RELEASE_LOCK('migrations_lock')
 ```
 
-Release is always called via `defer`. A release error is logged but does not mask the primary error.
-Lock can be disabled: `WithLock(false)`.
+**MySQL `GET_LOCK` is connection-scoped**: the lock belongs to the connection that called it and is automatically released when that connection closes or is killed. The runner obtains a *dedicated* `*sql.Conn` for the lock and keeps it alive until `RELEASE_LOCK` is called at the end of `Up`/`Down`. This means the connection pool must allow at least `MaxOpenConns >= 2`.
+
+Release is always called via `defer`. A release error is logged but does not mask the primary error. Lock can be disabled: `WithLock(false)`.
 
 ## Transactions
 
@@ -246,25 +257,41 @@ Lock can be disabled: `WithLock(false)`.
 | `TransactionAll`          | All pending migrations share one `BEGIN`/`COMMIT`. Every migration must implement `TxMigration`; a plain `Migration` causes an error. |
 | `TransactionNone`         | No `BEGIN`/`COMMIT` is created by the runner. `Migration.Up/Down` is called directly on `*sql.DB`. |
 
-> **Warning:** MySQL DDL (`CREATE TABLE`, `ALTER TABLE`, etc.) causes an implicit commit and cannot be rolled back. For pure DDL migrations implement `Migration` (not `TxMigration`). Reserve `TxMigration` for DML-only migrations.
+> **Warning — MySQL DDL cannot be rolled back.** `CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`, and `TRUNCATE` cause an implicit commit in MySQL. They execute immediately and **cannot be undone by a transaction rollback**, including `TransactionAll`. `TransactionAll` is safe only for pure-DML migrations. For DDL migrations, use `TransactionPerMigration` (default) or `TransactionNone`.
 
 ## Checksum
 
-By default: `sha256(version + "\x00" + name)`. Stored on first `Up`, verified on every subsequent run. Modifying an already-applied migration causes `ErrChecksumMismatch`.
+There are two checksum strategies:
 
-To detect changes in the SQL body, implement the optional `ChecksumMigration` interface:
+**Default checksum** (migrations that do NOT implement `ChecksumMigration`):
+`sha256(version + "\x00" + name)`. This detects renames and version changes but **does not detect SQL body edits**.
+
+**Generated / SQL-body checksum** (migrations created by the generator):
+The generator produces `Checksum()` that computes `sha256(upSQL + "\x00" + downSQL)` from package-level SQL constants. Editing the SQL constant changes the checksum, which triggers `ErrChecksumMismatch` before the modified migration can be silently re-applied.
 
 ```go
-type ChecksumMigration interface {
-    Checksum() string
-}
+// Generated migration (simplified):
+const createUsersTableUpSQL = `CREATE TABLE users ...`
+const createUsersTableDownSQL = `DROP TABLE IF EXISTS users`
 
-func (m MyMigration) Checksum() string {
-    return "sha256:<hash-of-your-sql-body>"
+func (m CreateUsersTable20260608120000) Checksum() string {
+    h := sha256.New()
+    h.Write([]byte(createUsersTableUpSQL))
+    h.Write([]byte{0})
+    h.Write([]byte(createUsersTableDownSQL))
+    return fmt.Sprintf("%x", h.Sum(nil))
 }
 ```
 
-If `Checksum()` returns an empty string, the default sha256(version+name) is used as fallback.
+For hand-written migrations, implement `ChecksumMigration` to opt in to SQL-body detection:
+
+```go
+func (m MyMigration) Checksum() string {
+    return "sha256:<hash-of-sql-body>"
+}
+```
+
+If `Checksum()` returns an empty string, the default `sha256(version+name)` is used as fallback.
 
 Use `WithAllowDirty(true)` to skip checksum validation (not recommended in production).
 
@@ -289,9 +316,11 @@ var (
     ErrMigrationNotApplied     = errors.New("migration not applied")
     ErrChecksumMismatch        = errors.New("migration checksum mismatch")
     ErrLockNotAcquired         = errors.New("migration lock not acquired")
-    ErrDirtyState              = errors.New("migration dirty state")  // blocked by a failed migration
+    ErrDirtyState              = errors.New("migration dirty state")       // blocked by a failed migration
     ErrInvalidIdentifier       = errors.New("invalid identifier")
     ErrDuplicateVersion        = errors.New("duplicate migration version")
+    ErrUnsupportedDialect      = errors.New("unsupported dialect")         // WithDialect: only MySQL accepted
+    ErrInvalidMigration        = errors.New("invalid migration")           // WithMigrations: nil/empty version/name
 )
 ```
 

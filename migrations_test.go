@@ -2,6 +2,7 @@ package migrations_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -241,6 +242,125 @@ func TestChecksumMigration_FallbackOnEmpty(t *testing.T) {
 	want := migrations.Checksum(newFake("20260101", "create_users"))
 	if got != want {
 		t.Fatalf("expected fallback checksum %s, got %s", want, got)
+	}
+}
+
+// ── WithMigrations validation ─────────────────────────────────────────────────
+
+func TestWithMigrations_NilMigration(t *testing.T) {
+	db := openFakeDB(t)
+	_, err := migrations.NewMigrator(db, migrations.WithMigrations(nil))
+	if err == nil {
+		t.Fatal("expected error for nil migration")
+	}
+	if !errors.Is(err, migrations.ErrInvalidMigration) {
+		t.Fatalf("expected ErrInvalidMigration, got %v", err)
+	}
+}
+
+func TestWithMigrations_EmptyVersion(t *testing.T) {
+	db := openFakeDB(t)
+	_, err := migrations.NewMigrator(db, migrations.WithMigrations(newFake("", "name")))
+	if err == nil {
+		t.Fatal("expected error for empty version")
+	}
+	if !errors.Is(err, migrations.ErrInvalidMigration) {
+		t.Fatalf("expected ErrInvalidMigration, got %v", err)
+	}
+}
+
+func TestWithMigrations_EmptyName(t *testing.T) {
+	db := openFakeDB(t)
+	_, err := migrations.NewMigrator(db, migrations.WithMigrations(newFake("20260101", "")))
+	if err == nil {
+		t.Fatal("expected error for empty name")
+	}
+	if !errors.Is(err, migrations.ErrInvalidMigration) {
+		t.Fatalf("expected ErrInvalidMigration, got %v", err)
+	}
+}
+
+// ── WithDialect ───────────────────────────────────────────────────────────────
+
+func TestWithDialect_MySQL(t *testing.T) {
+	db := openFakeDB(t)
+	_, err := migrations.NewMigrator(db, migrations.WithDialect(migrations.MySQL))
+	if err != nil {
+		t.Fatalf("MySQL dialect should be accepted: %v", err)
+	}
+}
+
+func TestWithDialect_Unsupported(t *testing.T) {
+	db := openFakeDB(t)
+	_, err := migrations.NewMigrator(db, migrations.WithDialect("postgres"))
+	if err == nil {
+		t.Fatal("expected error for unsupported dialect")
+	}
+	if !errors.Is(err, migrations.ErrUnsupportedDialect) {
+		t.Fatalf("expected ErrUnsupportedDialect, got %v", err)
+	}
+}
+
+// ── Checksum — SQL body change detection ─────────────────────────────────────
+
+// sqlBodyMigration simulates a generated migration whose Checksum() is derived
+// from SQL content (upSQL and downSQL), just as the generator produces.
+type sqlBodyMigration struct {
+	version string
+	name    string
+	upSQL   string
+	downSQL string
+}
+
+func (m sqlBodyMigration) Version() string                         { return m.version }
+func (m sqlBodyMigration) Name() string                            { return m.name }
+func (m sqlBodyMigration) Up(_ context.Context, _ *sql.DB) error   { return nil }
+func (m sqlBodyMigration) Down(_ context.Context, _ *sql.DB) error { return nil }
+func (m sqlBodyMigration) Checksum() string {
+	h := sha256.New()
+	h.Write([]byte(m.upSQL))
+	h.Write([]byte{0})
+	h.Write([]byte(m.downSQL))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func TestChecksumSQL_ChangeDetected(t *testing.T) {
+	base := sqlBodyMigration{
+		version: "20260101", name: "create_users",
+		upSQL: "CREATE TABLE users (id BIGINT)", downSQL: "DROP TABLE users",
+	}
+	changed := sqlBodyMigration{
+		version: "20260101", name: "create_users",
+		upSQL: "CREATE TABLE users (id BIGINT, email VARCHAR(255))", downSQL: "DROP TABLE users",
+	}
+	c1 := migrations.Checksum(base)
+	c2 := migrations.Checksum(changed)
+	if c1 == c2 {
+		t.Fatal("modifying upSQL must change the checksum")
+	}
+}
+
+func TestChecksumSQL_SameSQL_SameChecksum(t *testing.T) {
+	m := sqlBodyMigration{
+		version: "20260101", name: "create_users",
+		upSQL: "CREATE TABLE users (id BIGINT)", downSQL: "DROP TABLE users",
+	}
+	if migrations.Checksum(m) != migrations.Checksum(m) {
+		t.Fatal("checksum must be deterministic")
+	}
+}
+
+func TestChecksumSQL_DownSQLChange(t *testing.T) {
+	base := sqlBodyMigration{
+		version: "20260101", name: "n",
+		upSQL: "CREATE TABLE t (id INT)", downSQL: "DROP TABLE t",
+	}
+	changed := sqlBodyMigration{
+		version: "20260101", name: "n",
+		upSQL: "CREATE TABLE t (id INT)", downSQL: "DROP TABLE t CASCADE",
+	}
+	if migrations.Checksum(base) == migrations.Checksum(changed) {
+		t.Fatal("modifying downSQL must change the checksum")
 	}
 }
 

@@ -68,8 +68,20 @@ func defaultOptions() options {
 type Option func(*options) error
 
 // WithMigrations adds migrations to the migrator.
+// Returns ErrInvalidMigration if any migration is nil or has an empty Version or Name.
 func WithMigrations(ms ...Migration) Option {
 	return func(o *options) error {
+		for _, m := range ms {
+			if m == nil {
+				return fmt.Errorf("WithMigrations: nil migration: %w", ErrInvalidMigration)
+			}
+			if m.Version() == "" {
+				return fmt.Errorf("WithMigrations: empty version: %w", ErrInvalidMigration)
+			}
+			if m.Name() == "" {
+				return fmt.Errorf("WithMigrations: empty name: %w", ErrInvalidMigration)
+			}
+		}
 		o.migrations = append(o.migrations, ms...)
 		return nil
 	}
@@ -87,9 +99,13 @@ func WithTableName(name string) Option {
 	}
 }
 
-// WithDialect sets the database dialect.
+// WithDialect sets the database dialect. Only MySQL is supported; any other value
+// returns ErrUnsupportedDialect.
 func WithDialect(dialect Dialect) Option {
 	return func(o *options) error {
+		if dialect != MySQL {
+			return fmt.Errorf("WithDialect %q: %w", dialect, ErrUnsupportedDialect)
+		}
 		o.dialect = dialect
 		return nil
 	}

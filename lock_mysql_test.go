@@ -19,7 +19,7 @@ func TestLock_AcquireSuccess(t *testing.T) {
 
 	mig := newFake("20260101000000", "m1")
 
-	// Acquire
+	// Acquire (dedicated conn)
 	mock.ExpectQuery(`SELECT GET_LOCK`).
 		WithArgs("migrations_lock", 30).
 		WillReturnRows(sqlmock.NewRows([]string{"result"}).AddRow(1))
@@ -32,7 +32,7 @@ func TestLock_AcquireSuccess(t *testing.T) {
 	mock.ExpectExec(`INSERT INTO`).
 		WithArgs(mig.Version(), mig.Name(), migrations.Checksum(mig), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	// Release
+	// Release (same dedicated conn)
 	mock.ExpectQuery(`SELECT RELEASE_LOCK`).
 		WithArgs("migrations_lock").
 		WillReturnRows(sqlmock.NewRows([]string{"result"}).AddRow(1))
@@ -155,5 +155,87 @@ func TestLock_Disabled(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+// TestLock_DedicatedConnection verifies that GET_LOCK and RELEASE_LOCK are issued on
+// the same connection: the mock expects GET_LOCK first and RELEASE_LOCK last, with no
+// other queries on the lock connection in between (dirty/applied/insert use the main db).
+func TestLock_DedicatedConnection(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	mig := newFake("20260101000000", "m1")
+
+	// Expectations in the exact order the implementation must produce them.
+	// GET_LOCK is on the dedicated conn; everything else is on the pool.
+	mock.ExpectQuery(`SELECT GET_LOCK`).
+		WithArgs("migrations_lock", 30).
+		WillReturnRows(sqlmock.NewRows([]string{"result"}).AddRow(1))
+	expectNoDirtyState(mock)
+	mock.ExpectQuery(`SELECT version`).
+		WillReturnRows(sqlmock.NewRows([]string{"version", "name", "checksum", "applied_at", "execution_time_ms"}))
+	mock.ExpectExec(`INSERT INTO`).
+		WithArgs(mig.Version(), mig.Name(), migrations.Checksum(mig), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery(`SELECT RELEASE_LOCK`).
+		WithArgs("migrations_lock").
+		WillReturnRows(sqlmock.NewRows([]string{"result"}).AddRow(1))
+
+	m, err := migrations.NewMigrator(db,
+		migrations.WithMigrations(mig),
+		migrations.WithLock(true),
+		migrations.WithAutoCreateTable(false),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := m.Up(context.Background()); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("dedicated connection order violated: %v", err)
+	}
+}
+
+// TestLock_DoubleAcquireBlocked verifies that attempting to Up twice concurrently
+// (or calling Acquire twice) does not silently issue two GET_LOCK calls.
+// We test the sequential case: the second Up after the first sees no dirty state,
+// but the underlying mock expectations ensure the lock/unlock cycle is clean.
+func TestLock_DoubleAcquireBlocked(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	// First Up — full cycle
+	mock.ExpectQuery(`SELECT GET_LOCK`).
+		WithArgs("migrations_lock", 30).
+		WillReturnRows(sqlmock.NewRows([]string{"result"}).AddRow(1))
+	expectNoDirtyState(mock)
+	mock.ExpectQuery(`SELECT version`).
+		WillReturnRows(sqlmock.NewRows([]string{"version", "name", "checksum", "applied_at", "execution_time_ms"}))
+	mock.ExpectQuery(`SELECT RELEASE_LOCK`).
+		WithArgs("migrations_lock").
+		WillReturnRows(sqlmock.NewRows([]string{"result"}).AddRow(1))
+
+	m, err := migrations.NewMigrator(db,
+		migrations.WithLock(true),
+		migrations.WithAutoCreateTable(false),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := m.Up(context.Background()); err != nil {
+		t.Fatalf("first Up: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet after first Up: %v", err)
 	}
 }

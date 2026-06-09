@@ -1,6 +1,6 @@
 module github.com/akula410/migrations/v2
 
-go 1.24.0
+go 1.26.4
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2

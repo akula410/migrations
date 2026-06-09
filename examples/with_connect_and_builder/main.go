@@ -38,10 +38,10 @@ func (m CreateCommentsTable20260608000004) Up(ctx context.Context, db *sql.DB) e
 	_, err := exec.ExecContext(ctx,
 		sqlbuilder.CreateTable("comments").
 			IfNotExists().
-			Column(sqlbuilder.Col("id").BigIntUnsigned().NotNull().AutoIncrement()).
-			Column(sqlbuilder.Col("post_id").BigIntUnsigned().NotNull()).
-			Column(sqlbuilder.Col("body").Text().NotNull()).
-			Column(sqlbuilder.Col("created_at").Timestamp().NotNull().Default("CURRENT_TIMESTAMP")).
+			Column(sqlbuilder.Column("id", "BIGINT UNSIGNED").NotNull().AutoIncrement()).
+			Column(sqlbuilder.Column("post_id", "BIGINT UNSIGNED").NotNull()).
+			Column(sqlbuilder.Column("body", "TEXT").NotNull()).
+			Column(sqlbuilder.Column("created_at", "TIMESTAMP").NotNull().DefaultRaw("CURRENT_TIMESTAMP")).
 			PrimaryKey("id").
 			Engine("InnoDB").
 			Collate("utf8mb4_unicode_ci"),
