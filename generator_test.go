@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	migrations "github.com/akula410/migrations"
+	migrations "github.com/akula410/migrations/v2"
 )
 
 func TestGenerateMigration_CreatesFile(t *testing.T) {

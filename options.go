@@ -21,7 +21,8 @@ const (
 	TransactionPerMigration TransactionMode = iota
 	// TransactionAll wraps all TxMigrations in a single shared transaction.
 	TransactionAll
-	// TransactionNone disables transaction wrapping; each TxMigration still gets its own tx.
+	// TransactionNone disables all transaction wrapping. The runner calls Migration.Up/Down
+	// directly on *sql.DB without creating any *sql.Tx, even for TxMigration implementations.
 	TransactionNone
 )
 

@@ -22,7 +22,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	sqlbuilder "github.com/akula410/builder/v2"
-	migrations "github.com/akula410/migrations"
+	migrations "github.com/akula410/migrations/v2"
 )
 
 // CreateTagsTable20260608000003 builds its schema using the builder DDL API.

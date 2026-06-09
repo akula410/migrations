@@ -7,7 +7,7 @@ import (
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
-	migrations "github.com/akula410/migrations"
+	migrations "github.com/akula410/migrations/v2"
 )
 
 func TestLock_AcquireSuccess(t *testing.T) {
@@ -23,10 +23,12 @@ func TestLock_AcquireSuccess(t *testing.T) {
 	mock.ExpectQuery(`SELECT GET_LOCK`).
 		WithArgs("migrations_lock", 30).
 		WillReturnRows(sqlmock.NewRows([]string{"result"}).AddRow(1))
-	// Applied (pending check)
+	// Dirty check
+	expectNoDirtyState(mock)
+	// Applied (pending check — no applied migrations, so mig is pending)
 	mock.ExpectQuery(`SELECT version`).
 		WillReturnRows(sqlmock.NewRows([]string{"version", "name", "checksum", "applied_at", "execution_time_ms"}))
-	// Insert
+	// Insert (UPSERT)
 	mock.ExpectExec(`INSERT INTO`).
 		WithArgs(mig.Version(), mig.Name(), migrations.Checksum(mig), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -97,6 +99,8 @@ func TestLock_ReleaseLockError(t *testing.T) {
 	mock.ExpectQuery(`SELECT GET_LOCK`).
 		WithArgs("migrations_lock", 30).
 		WillReturnRows(sqlmock.NewRows([]string{"result"}).AddRow(1))
+	// Dirty check
+	expectNoDirtyState(mock)
 	// Applied: no pending
 	mock.ExpectQuery(`SELECT version`).
 		WillReturnRows(sqlmock.NewRows([]string{"version", "name", "checksum", "applied_at", "execution_time_ms"}))
@@ -131,6 +135,9 @@ func TestLock_Disabled(t *testing.T) {
 	defer db.Close()
 
 	// No GET_LOCK/RELEASE_LOCK expected
+	// Dirty check
+	expectNoDirtyState(mock)
+	// Applied: no pending
 	mock.ExpectQuery(`SELECT version`).
 		WillReturnRows(sqlmock.NewRows([]string{"version", "name", "checksum", "applied_at", "execution_time_ms"}))
 

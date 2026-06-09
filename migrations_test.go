@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	migrations "github.com/akula410/migrations"
-	_ "github.com/akula410/migrations/internal/testutil"
+	migrations "github.com/akula410/migrations/v2"
+	_ "github.com/akula410/migrations/v2/internal/testutil"
 )
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
@@ -33,6 +33,7 @@ func newFake(version, name string) fakeMigration {
 // fakeStore is an in-memory Store for unit tests.
 type fakeStore struct {
 	applied []migrations.AppliedMigration
+	dirty   *migrations.DirtyMigration
 }
 
 func (s *fakeStore) CreateTable(_ context.Context) error { return nil }
@@ -41,6 +42,7 @@ func (s *fakeStore) Applied(_ context.Context) ([]migrations.AppliedMigration, e
 }
 func (s *fakeStore) Insert(_ context.Context, am migrations.AppliedMigration) error {
 	s.applied = append(s.applied, am)
+	s.dirty = nil
 	return nil
 }
 func (s *fakeStore) Delete(_ context.Context, version string) error {
@@ -51,6 +53,19 @@ func (s *fakeStore) Delete(_ context.Context, version string) error {
 		}
 	}
 	s.applied = out
+	return nil
+}
+func (s *fakeStore) Dirty(_ context.Context) (*migrations.DirtyMigration, error) {
+	return s.dirty, nil
+}
+func (s *fakeStore) MarkFailed(_ context.Context, f migrations.FailedMigration) error {
+	s.dirty = &migrations.DirtyMigration{
+		Version:   f.Version,
+		Name:      f.Name,
+		Checksum:  f.Checksum,
+		Direction: f.Direction,
+		ErrorText: f.ErrorText,
+	}
 	return nil
 }
 
@@ -194,6 +209,38 @@ func TestWithLockTimeout(t *testing.T) {
 	_, err := migrations.NewMigrator(db, migrations.WithLockTimeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// ── ChecksumMigration interface ───────────────────────────────────────────────
+
+type fakeChecksumMigration struct {
+	fakeMigration
+	cs string
+}
+
+func (f fakeChecksumMigration) Checksum() string { return f.cs }
+
+func TestChecksumMigration_Custom(t *testing.T) {
+	m := fakeChecksumMigration{
+		fakeMigration: newFake("20260101", "create_users"),
+		cs:            "my-custom-checksum",
+	}
+	got := migrations.Checksum(m)
+	if got != "my-custom-checksum" {
+		t.Fatalf("expected custom checksum, got %s", got)
+	}
+}
+
+func TestChecksumMigration_FallbackOnEmpty(t *testing.T) {
+	m := fakeChecksumMigration{
+		fakeMigration: newFake("20260101", "create_users"),
+		cs:            "", // empty → sha256 fallback
+	}
+	got := migrations.Checksum(m)
+	want := migrations.Checksum(newFake("20260101", "create_users"))
+	if got != want {
+		t.Fatalf("expected fallback checksum %s, got %s", want, got)
 	}
 }
 

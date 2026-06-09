@@ -75,13 +75,16 @@ func (m *Migrator) Up(ctx context.Context) error {
 	return m.UpSteps(ctx, 0)
 }
 
-// UpSteps applies up to steps pending migrations.
-// If steps <= 0 all pending migrations are applied.
+// UpSteps applies up to steps pending migrations. If steps <= 0 all pending are applied.
 func (m *Migrator) UpSteps(ctx context.Context, steps int) error {
 	if err := m.lock.Acquire(ctx); err != nil {
 		return err
 	}
 	defer m.releaseLock(ctx)
+
+	if err := m.checkDirtyState(ctx); err != nil {
+		return err
+	}
 
 	pending, err := m.pendingMigrations(ctx)
 	if err != nil {
@@ -100,8 +103,7 @@ func (m *Migrator) Down(ctx context.Context) error {
 	return m.DownSteps(ctx, 1)
 }
 
-// DownSteps rolls back the last steps applied migrations.
-// If steps <= 0 it defaults to 1.
+// DownSteps rolls back the last steps applied migrations. If steps <= 0 it defaults to 1.
 func (m *Migrator) DownSteps(ctx context.Context, steps int) error {
 	if steps <= 0 {
 		steps = 1
@@ -111,6 +113,10 @@ func (m *Migrator) DownSteps(ctx context.Context, steps int) error {
 		return err
 	}
 	defer m.releaseLock(ctx)
+
+	if err := m.checkDirtyState(ctx); err != nil {
+		return err
+	}
 
 	applied, err := m.store.Applied(ctx)
 	if err != nil {
@@ -137,7 +143,7 @@ func (m *Migrator) DownSteps(ctx context.Context, steps int) error {
 	return nil
 }
 
-// Status returns the current status of every registered migration.
+// Status returns the current state of every registered migration, including any dirty state.
 func (m *Migrator) Status(ctx context.Context) ([]StatusItem, error) {
 	applied, err := m.store.Applied(ctx)
 	if err != nil {
@@ -147,6 +153,11 @@ func (m *Migrator) Status(ctx context.Context) ([]StatusItem, error) {
 	appliedMap := make(map[string]AppliedMigration, len(applied))
 	for _, a := range applied {
 		appliedMap[a.Version] = a
+	}
+
+	dirty, err := m.store.Dirty(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	items := make([]StatusItem, 0, len(m.opts.migrations))
@@ -160,6 +171,10 @@ func (m *Migrator) Status(ctx context.Context) ([]StatusItem, error) {
 			item.Applied = true
 			item.AppliedAt = a.AppliedAt
 			item.ExecutionTime = a.ExecutionTime
+		}
+		if dirty != nil && mig.Version() == dirty.Version {
+			item.Dirty = true
+			item.DirtyError = dirty.ErrorText
 		}
 		items = append(items, item)
 	}
@@ -176,8 +191,12 @@ func (m *Migrator) Applied(ctx context.Context) ([]AppliedMigration, error) {
 	return m.store.Applied(ctx)
 }
 
-// Validate checks that every applied migration still matches its recorded checksum.
+// Validate checks for dirty state and that every applied migration matches its checksum.
 func (m *Migrator) Validate(ctx context.Context) error {
+	if err := m.checkDirtyState(ctx); err != nil {
+		return err
+	}
+
 	applied, err := m.store.Applied(ctx)
 	if err != nil {
 		return err
@@ -201,6 +220,22 @@ func (m *Migrator) Validate(ctx context.Context) error {
 }
 
 // ─── internals ───────────────────────────────────────────────────────────────
+
+// checkDirtyState returns ErrDirtyState if the store contains a failed migration
+// and WithAllowDirty is false.
+func (m *Migrator) checkDirtyState(ctx context.Context) error {
+	if m.opts.allowDirty {
+		return nil
+	}
+	dirty, err := m.store.Dirty(ctx)
+	if err != nil {
+		return err
+	}
+	if dirty != nil {
+		return fmt.Errorf("version %s direction=%s: %w", dirty.Version, dirty.Direction, ErrDirtyState)
+	}
+	return nil
+}
 
 func (m *Migrator) releaseLock(ctx context.Context) {
 	if err := m.lock.Release(ctx); err != nil {
@@ -264,24 +299,41 @@ func (m *Migrator) runOneUp(ctx context.Context, mig Migration) error {
 	start := time.Now()
 
 	var runErr error
-	if txm, ok := mig.(TxMigration); ok {
-		tx, err := m.db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("up %s: begin tx: %w", mig.Version(), err)
-		}
-		if runErr = txm.UpTx(ctx, tx); runErr != nil {
-			_ = tx.Rollback()
-		} else if runErr = tx.Commit(); runErr != nil {
-			runErr = fmt.Errorf("commit: %w", runErr)
-		}
-	} else {
+	switch m.opts.transactionMode {
+	case TransactionNone:
+		// No transaction created by the runner. Use db directly regardless of TxMigration.
 		runErr = mig.Up(ctx, m.db)
+	default:
+		// TransactionPerMigration: TxMigration gets its own tx; plain Migration uses db.
+		if txm, ok := mig.(TxMigration); ok {
+			tx, err := m.db.BeginTx(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("up %s: begin tx: %w", mig.Version(), err)
+			}
+			if runErr = txm.UpTx(ctx, tx); runErr != nil {
+				_ = tx.Rollback()
+			} else if runErr = tx.Commit(); runErr != nil {
+				runErr = fmt.Errorf("commit: %w", runErr)
+			}
+		} else {
+			runErr = mig.Up(ctx, m.db)
+		}
 	}
 
 	elapsed := time.Since(start)
 
 	if runErr != nil {
 		m.opts.logger.Printf("migrations: failed %s: %v (%s)", mig.Version(), runErr, elapsed)
+		if err := m.store.MarkFailed(ctx, FailedMigration{
+			Version:       mig.Version(),
+			Name:          mig.Name(),
+			Checksum:      Checksum(mig),
+			Direction:     "up",
+			ErrorText:     runErr.Error(),
+			ExecutionTime: elapsed,
+		}); err != nil {
+			m.opts.logger.Printf("migrations: failed to record dirty state for %s: %v", mig.Version(), err)
+		}
 		return fmt.Errorf("up %s: %w", mig.Version(), runErr)
 	}
 
@@ -298,7 +350,15 @@ func (m *Migrator) runOneUp(ctx context.Context, mig Migration) error {
 	return nil
 }
 
+// applyUpInTx runs all pending migrations in a single shared transaction (TransactionAll).
+// All migrations must implement TxMigration; plain Migration returns an error.
 func (m *Migrator) applyUpInTx(ctx context.Context, pending []Migration) error {
+	for _, mig := range pending {
+		if _, ok := mig.(TxMigration); !ok {
+			return fmt.Errorf("transaction all requires TxMigration: %s %s", mig.Version(), mig.Name())
+		}
+	}
+
 	tx, err := m.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("migrations: begin tx: %w", err)
@@ -315,16 +375,20 @@ func (m *Migrator) applyUpInTx(ctx context.Context, pending []Migration) error {
 	for i, mig := range pending {
 		starts[i] = time.Now()
 		m.opts.logger.Printf("migrations: applying %s %s", mig.Version(), mig.Name())
-
-		var runErr error
-		if txm, ok := mig.(TxMigration); ok {
-			runErr = txm.UpTx(ctx, tx)
-		} else {
-			runErr = mig.Up(ctx, m.db)
-		}
-
-		if runErr != nil {
+		txm := mig.(TxMigration) // validated above
+		if runErr := txm.UpTx(ctx, tx); runErr != nil {
 			m.opts.logger.Printf("migrations: failed %s: %v", mig.Version(), runErr)
+			elapsed := time.Since(starts[i])
+			if err := m.store.MarkFailed(ctx, FailedMigration{
+				Version:       mig.Version(),
+				Name:          mig.Name(),
+				Checksum:      Checksum(mig),
+				Direction:     "up",
+				ErrorText:     runErr.Error(),
+				ExecutionTime: elapsed,
+			}); err != nil {
+				m.opts.logger.Printf("migrations: failed to record dirty state for %s: %v", mig.Version(), err)
+			}
 			return fmt.Errorf("up %s: %w", mig.Version(), runErr)
 		}
 	}
@@ -353,24 +417,41 @@ func (m *Migrator) runOneDown(ctx context.Context, mig Migration) error {
 	start := time.Now()
 
 	var runErr error
-	if txm, ok := mig.(TxMigration); ok {
-		tx, err := m.db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("down %s: begin tx: %w", mig.Version(), err)
-		}
-		if runErr = txm.DownTx(ctx, tx); runErr != nil {
-			_ = tx.Rollback()
-		} else if runErr = tx.Commit(); runErr != nil {
-			runErr = fmt.Errorf("commit: %w", runErr)
-		}
-	} else {
+	switch m.opts.transactionMode {
+	case TransactionNone:
+		// No transaction created by the runner.
 		runErr = mig.Down(ctx, m.db)
+	default:
+		// TransactionPerMigration: TxMigration gets its own tx; plain Migration uses db.
+		if txm, ok := mig.(TxMigration); ok {
+			tx, err := m.db.BeginTx(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("down %s: begin tx: %w", mig.Version(), err)
+			}
+			if runErr = txm.DownTx(ctx, tx); runErr != nil {
+				_ = tx.Rollback()
+			} else if runErr = tx.Commit(); runErr != nil {
+				runErr = fmt.Errorf("commit: %w", runErr)
+			}
+		} else {
+			runErr = mig.Down(ctx, m.db)
+		}
 	}
 
 	elapsed := time.Since(start)
 
 	if runErr != nil {
 		m.opts.logger.Printf("migrations: rollback failed %s: %v (%s)", mig.Version(), runErr, elapsed)
+		if err := m.store.MarkFailed(ctx, FailedMigration{
+			Version:       mig.Version(),
+			Name:          mig.Name(),
+			Checksum:      Checksum(mig),
+			Direction:     "down",
+			ErrorText:     runErr.Error(),
+			ExecutionTime: elapsed,
+		}); err != nil {
+			m.opts.logger.Printf("migrations: failed to record dirty state for %s: %v", mig.Version(), err)
+		}
 		return fmt.Errorf("down %s: %w", mig.Version(), runErr)
 	}
 

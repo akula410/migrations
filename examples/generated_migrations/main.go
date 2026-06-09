@@ -17,8 +17,8 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	migrations "github.com/akula410/migrations"
-	mymigrations "github.com/akula410/migrations/examples/generated_migrations/migrations"
+	migrations "github.com/akula410/migrations/v2"
+	mymigrations "github.com/akula410/migrations/v2/examples/generated_migrations/migrations"
 )
 
 func main() {

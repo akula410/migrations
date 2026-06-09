@@ -8,19 +8,16 @@ import (
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
-	migrations "github.com/akula410/migrations"
+	migrations "github.com/akula410/migrations/v2"
 )
 
-func newMockDB(t *testing.T) (interface {
-	Applied(context.Context) ([]migrations.AppliedMigration, error)
-	Insert(context.Context, migrations.AppliedMigration) error
-	Delete(context.Context, string) error
-	CreateTable(context.Context) error
-}, sqlmock.Sqlmock) {
-	t.Helper()
-	// We test the mysqlStore behaviour by exercising the full Migrator with a
-	// sqlmock db, validating queries at the mock level.
-	return nil, nil
+// expectNoDirtyState sets up the sqlmock to return no dirty migration.
+// The COALESCE pattern uniquely identifies the Dirty() query.
+func expectNoDirtyState(mock sqlmock.Sqlmock) {
+	mock.ExpectQuery(`COALESCE`).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"version", "name", "checksum", "direction", "error_text", "applied_at", "execution_time_ms",
+		}))
 }
 
 // storeFromMock creates a *sql.DB backed by sqlmock for direct store testing.
@@ -68,10 +65,12 @@ func TestStore_InsertAppliedMigration(t *testing.T) {
 	// Init
 	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
+	// Dirty check
+	expectNoDirtyState(mock)
 	// Applied query
 	mock.ExpectQuery(`SELECT version`).
 		WillReturnRows(sqlmock.NewRows([]string{"version", "name", "checksum", "applied_at", "execution_time_ms"}))
-	// Insert
+	// Insert (UPSERT)
 	mock.ExpectExec(`INSERT INTO`).
 		WithArgs(mig.Version(), mig.Name(), migrations.Checksum(mig), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -146,6 +145,8 @@ func TestStore_DeleteOnDown(t *testing.T) {
 	at := time.Now().UTC()
 	cs := migrations.Checksum(mig)
 
+	// Dirty check
+	expectNoDirtyState(mock)
 	// Applied query for DownSteps
 	mock.ExpectQuery(`SELECT version`).
 		WillReturnRows(sqlmock.NewRows(

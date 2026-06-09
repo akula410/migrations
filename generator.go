@@ -49,12 +49,15 @@ func (m {{.StructName}}) Down(ctx context.Context, db *sql.DB) error {
 	` + "`" + `)
 	return err
 }
+
+// TODO: optionally implement ChecksumMigration to detect SQL body changes:
+// func (m {{.StructName}}) Checksum() string { return "sha256:<hash-of-sql-body>" }
 `))
 
 var listTmpl = template.Must(template.New("list").Parse(
 	`package {{.PackageName}}
 
-import base "github.com/akula410/migrations"
+import base "github.com/akula410/migrations/v2"
 
 // List contains all registered migrations in version order.
 var List = []base.Migration{

@@ -5,9 +5,15 @@ import (
 	"fmt"
 )
 
-// Checksum returns a stable SHA-256 based checksum for a migration.
-// It is derived from Version and Name, making it independent of file location.
+// Checksum returns a stable checksum for a migration.
+// If m implements ChecksumMigration and its Checksum() returns a non-empty string,
+// that value is used directly. Otherwise sha256(version + "\x00" + name) is used.
 func Checksum(m Migration) string {
+	if cm, ok := m.(ChecksumMigration); ok {
+		if cs := cm.Checksum(); cs != "" {
+			return cs
+		}
+	}
 	h := sha256.New()
 	h.Write([]byte(m.Version()))
 	h.Write([]byte{0})

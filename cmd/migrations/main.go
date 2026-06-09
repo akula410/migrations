@@ -1,4 +1,4 @@
-// Command migrations is a CLI example for github.com/akula410/migrations.
+// Command migrations is a CLI example for github.com/akula410/migrations/v2.
 //
 // Usage:
 //
@@ -22,11 +22,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 
-	migrations "github.com/akula410/migrations"
+	migrations "github.com/akula410/migrations/v2"
 )
 
 // Register your migrations here.
@@ -143,15 +144,20 @@ func runDB(cmd string) {
 
 func printStatus(items []migrations.StatusItem) {
 	fmt.Printf("%-16s  %-32s  %-8s  %s\n", "VERSION", "NAME", "STATUS", "APPLIED AT")
-	fmt.Println(string(make([]byte, 80)))
+	fmt.Println(strings.Repeat("-", 80))
 	for _, it := range items {
 		status := "pending"
 		at := ""
-		if it.Applied {
+		if it.Dirty {
+			status = "dirty"
+		} else if it.Applied {
 			status = "applied"
 			at = it.AppliedAt.Format(time.RFC3339)
 		}
 		fmt.Printf("%-16s  %-32s  %-8s  %s\n", it.Version, it.Name, status, at)
+		if it.Dirty && it.DirtyError != "" {
+			fmt.Printf("  error: %s\n", it.DirtyError)
+		}
 	}
 }
 

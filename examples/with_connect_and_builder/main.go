@@ -24,7 +24,7 @@ import (
 	sqlbuilder "github.com/akula410/builder/v2"
 	connect "github.com/akula410/connect/v2"
 
-	migrations "github.com/akula410/migrations"
+	migrations "github.com/akula410/migrations/v2"
 )
 
 // CreateCommentsTable20260608000004 uses builder for DDL and connect for the connection.

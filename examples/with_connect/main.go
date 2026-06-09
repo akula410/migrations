@@ -22,7 +22,7 @@ import (
 
 	connect "github.com/akula410/connect/v2"
 
-	migrations "github.com/akula410/migrations"
+	migrations "github.com/akula410/migrations/v2"
 )
 
 type AddPostsTable20260608000002 struct{}

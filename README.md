@@ -24,7 +24,7 @@ Production-ready MySQL 8 migration runner for Go.
 ## Installation
 
 ```bash
-go get github.com/akula410/migrations
+go get github.com/akula410/migrations/v2
 ```
 
 ## Quick start
@@ -38,7 +38,7 @@ import (
     "log"
 
     _ "github.com/go-sql-driver/mysql"
-    migrations "github.com/akula410/migrations"
+    migrations "github.com/akula410/migrations/v2"
 )
 
 type CreateUsers20260608000001 struct{}
@@ -240,23 +240,45 @@ Lock can be disabled: `WithLock(false)`.
 
 ## Transactions
 
-| Mode                      | Behaviour                                                         |
-|---------------------------|-------------------------------------------------------------------|
-| `TransactionPerMigration` | Each `TxMigration` runs in its own transaction (default)          |
-| `TransactionAll`          | All `TxMigration` migrations share one transaction                |
-| `TransactionNone`         | Each `TxMigration` still runs in its own transaction              |
+| Mode                      | Behaviour                                                                           |
+|---------------------------|-------------------------------------------------------------------------------------|
+| `TransactionPerMigration` | Each `TxMigration` runs in its own `BEGIN`/`COMMIT` (default)                       |
+| `TransactionAll`          | All pending migrations share one `BEGIN`/`COMMIT`. Every migration must implement `TxMigration`; a plain `Migration` causes an error. |
+| `TransactionNone`         | No `BEGIN`/`COMMIT` is created by the runner. `Migration.Up/Down` is called directly on `*sql.DB`. |
 
 > **Warning:** MySQL DDL (`CREATE TABLE`, `ALTER TABLE`, etc.) causes an implicit commit and cannot be rolled back. For pure DDL migrations implement `Migration` (not `TxMigration`). Reserve `TxMigration` for DML-only migrations.
 
 ## Checksum
 
-`sha256(version + "\x00" + name)`. Stored on first `Up`, verified on every subsequent run. Modifying an already-applied migration causes `ErrChecksumMismatch`.
+By default: `sha256(version + "\x00" + name)`. Stored on first `Up`, verified on every subsequent run. Modifying an already-applied migration causes `ErrChecksumMismatch`.
 
-Use `WithAllowDirty(true)` to skip validation (not recommended in production).
+To detect changes in the SQL body, implement the optional `ChecksumMigration` interface:
+
+```go
+type ChecksumMigration interface {
+    Checksum() string
+}
+
+func (m MyMigration) Checksum() string {
+    return "sha256:<hash-of-your-sql-body>"
+}
+```
+
+If `Checksum()` returns an empty string, the default sha256(version+name) is used as fallback.
+
+Use `WithAllowDirty(true)` to skip checksum validation (not recommended in production).
+
+## Dirty state
+
+If a migration's `Up` or `Down` returns an error, the runner records a **dirty row** (`success=0`) in `schema_migrations`. Subsequent `Up` / `Down` / `Validate` calls return `ErrDirtyState` until the dirty record is resolved.
+
+Recovery options:
+- Fix the root cause and retry with `WithAllowDirty(true)` — on success the dirty row is cleared automatically via `INSERT ... ON DUPLICATE KEY UPDATE`.
+- Manually delete the dirty row from `schema_migrations` if the migration was partially applied and you want to start over.
 
 ## Rollback
 
-`Down` runs the migration's `Down` / `DownTx` and then deletes the record from `schema_migrations`. If `Down` fails, the row remains and the schema state is dirty. Recovery requires manual intervention.
+`Down` runs the migration's `Down` / `DownTx` and then deletes the record from `schema_migrations`. If `Down` fails, the row is marked dirty (`success=0`, `direction='down'`). Recovery requires manual intervention.
 
 ## Errors
 
@@ -267,7 +289,7 @@ var (
     ErrMigrationNotApplied     = errors.New("migration not applied")
     ErrChecksumMismatch        = errors.New("migration checksum mismatch")
     ErrLockNotAcquired         = errors.New("migration lock not acquired")
-    ErrDirtyState              = errors.New("migration dirty state")
+    ErrDirtyState              = errors.New("migration dirty state")  // blocked by a failed migration
     ErrInvalidIdentifier       = errors.New("invalid identifier")
     ErrDuplicateVersion        = errors.New("duplicate migration version")
 )
